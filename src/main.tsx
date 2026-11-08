@@ -7,27 +7,29 @@ import { validDay } from './model';
 import { DASHBOARD_ICON, DASHBOARD_ICON_SVG } from './icon';
 
 const VIEW_TYPE = 'vault-dashboard';
-interface DashboardSettings { openOnStartup: boolean }
-const DEFAULT_SETTINGS: DashboardSettings = { openOnStartup: false };
+interface DashboardSettings { openOnStartup: boolean; enableKanban: boolean }
+const DEFAULT_SETTINGS: DashboardSettings = { openOnStartup: false, enableKanban: false };
 
 class DashboardSettingTab extends PluginSettingTab {
   constructor(private dashboard: VaultDashboardPlugin) { super(dashboard.app, dashboard); }
   display() {
     this.containerEl.empty();
-    new Setting(this.containerEl)
-      .setName('起動時にダッシュボードを開く')
-      .setDesc('Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。')
-      .addToggle(toggle => toggle.setValue(this.dashboard.settings.openOnStartup).onChange(async value => {
-        const previous = this.dashboard.settings.openOnStartup;
-        this.dashboard.settings.openOnStartup = value;
-        try { await this.dashboard.saveSettings(); }
-        catch (error) {
-          this.dashboard.settings.openOnStartup = previous;
-          toggle.setValue(previous);
-          console.error('Vault Dashboard: 設定の保存に失敗しました。', error);
-          new Notice('設定を保存できませんでした。もう一度お試しください。');
-        }
-      }));
+    for (const [key, name, desc] of [
+      ['openOnStartup', '起動時にダッシュボードを開く', 'Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。'],
+      ['enableKanban', 'カンバンビューを有効にする', 'タスクをカンバン形式で表示します。オフにするとリスト表示に戻ります。保留・中止の列は必要なときに開けます。'],
+    ] as const) {
+      new Setting(this.containerEl).setName(name).setDesc(desc)
+        .addToggle(toggle => toggle.setValue(this.dashboard.settings[key]).onChange(async value => {
+          const previous = this.dashboard.settings[key];
+          this.dashboard.settings[key] = value;
+          try { await this.dashboard.saveSettings(); }
+          catch (error) {
+            this.dashboard.settings[key] = previous; toggle.setValue(previous);
+            console.error('Vault Dashboard: 設定の保存に失敗しました。', error);
+            new Notice('設定を保存できませんでした。もう一度お試しください。');
+          }
+        }));
+    }
   }
 }
 class Boundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {
@@ -63,9 +65,10 @@ export default class VaultDashboardPlugin extends Plugin {
   async onload() {
     addIcon(DASHBOARD_ICON, DASHBOARD_ICON_SVG);
     const saved = await this.loadData();
-    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup };
+    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, enableKanban: typeof saved?.enableKanban === 'boolean' ? saved.enableKanban : DEFAULT_SETTINGS.enableKanban };
     this.addSettingTab(new DashboardSettingTab(this));
     this.store = new DashboardStore(this.app, this);
+    this.store.kanbanEnabled = this.settings.enableKanban;
     this.registerView(VIEW_TYPE, leaf => new DashboardView(leaf, this.store));
     const open = async () => {
       const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -104,5 +107,9 @@ export default class VaultDashboardPlugin extends Plugin {
       } catch (e) { el.createEl('p', { cls: 'vd-error', text: (e as Error).message }); }
     });
   }
-  async saveSettings() { await this.saveData(this.settings); }
+  async saveSettings() {
+    await this.saveData(this.settings);
+    this.store.kanbanEnabled = this.settings.enableKanban;
+    this.store.invalidate();
+  }
 }

@@ -80,3 +80,19 @@ test('startup preference is persisted', async () => {
   await plugin.saveSettings();
   assert.equal(registrations.saved.openOnStartup, true);
 });
+
+test('kanban preference defaults off, persists, and updates existing store subscribers', async () => {
+  const { plugin } = await loadPlugin();
+  assert.equal(plugin.settings.enableKanban,false);
+  assert.equal(plugin.store.kanbanEnabled,false);
+  let changes=0; plugin.store.subscribe(()=>{changes++;});
+  plugin.settings.enableKanban=true;
+  await plugin.saveSettings();
+  assert.equal(plugin.store.kanbanEnabled,true); assert.equal(changes,1);
+  plugin.settings.enableKanban=false; await plugin.saveSettings();
+  assert.equal(plugin.store.kanbanEnabled,false); assert.equal(changes,2);
+  const loaded=await loadPlugin({enableKanban:true});
+  assert.equal(loaded.plugin.store.kanbanEnabled,true);
+  const invalid=await loadPlugin({enableKanban:'true'});
+  assert.equal(invalid.plugin.store.kanbanEnabled,false);
+});

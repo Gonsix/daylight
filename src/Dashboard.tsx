@@ -6,6 +6,7 @@ import { TimeSelection } from './TimeSelection';
 import { openEditEventModal, openEventModal } from './EventModal';
 import { rangeDateTimes } from './event';
 import { openTaskModal, openProjectModal } from './CreateModal';
+import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
 import { submitOnCommandEnter } from './shortcuts';
 import { carryovers, centeredScrollTop, completedTasks, dayKey, dayStart, filterTasks, hasSchedule, isActive, isStatus, Item, moveDay, STATUS, TaskTab, timeline, timeLabel } from './model';
@@ -160,6 +161,7 @@ export function Dashboard({ store, initialDate = null }: { store: DashboardStore
   const items = useMemo(() => store.items(), [store, revision]);
   const [now, setNow] = useState(Date.now()); const [chosenDay, setDay] = useState<string | null>(initialDate);
   const day = chosenDay ?? dayKey(now);
+  const kanban = store.kanbanEnabled;
   const [tab, setTab] = useState<TaskTab>('day'); const [project, setProject] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -172,6 +174,7 @@ export function Dashboard({ store, initialDate = null }: { store: DashboardStore
   const close = () => { setSelected(null); focusReturn.current?.focus(); };
   const scoped = useMemo(() => items.filter(i => !project || i.kind === 'project' || i.projectPath === project), [items, project]);
   const tasks = useMemo(() => filterTasks(tab==='all'?scoped:scoped.filter(isActive), day, tab), [scoped, day, tab]);
+  const boardTasks = useMemo(() => kanbanTasks(scoped,day,tab),[scoped,day,tab]);
   const past = useMemo(() => carryovers(scoped, day), [scoped, day]);
   const finished = useMemo(()=>completedTasks(scoped,day),[scoped,day]);
   const projects = items.filter(i => i.kind === 'project' && !i.archived && isActive(i));
@@ -191,11 +194,12 @@ export function Dashboard({ store, initialDate = null }: { store: DashboardStore
       <Timeline items={scoped} day={day} now={now} store={store} onSelect={select} projectPath={project ?? ''} />
       <div className="vd-side">
         <section className="vd-panel vd-tasks">
-          <div className="vd-section-head"><h2>タスク</h2><span className="vd-count">{tasks.length}</span><button className="vd-icon-button vd-add-item" aria-label="タスクを追加" title="タスクを追加" onClick={() => openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '')}>＋</button></div>
+          <div className="vd-section-head"><h2>タスク</h2><span className="vd-count">{kanban ? boardTasks.length : tasks.length}</span><button className="vd-icon-button vd-add-item" aria-label="タスクを追加" title="タスクを追加" onClick={() => openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '')}>＋</button></div>
           <div className="vd-tabs" role="tablist" aria-label="タスクの表示範囲">
             {([['day', '選択日'], ['ongoing', '進行中'], ['unscheduled', '予定日未定'], ['all', 'すべて']] as const).map(([id, label]) =>
               <button role="tab" aria-selected={tab === id} className={tab === id ? 'is-active' : ''} key={id} onClick={() => setTab(id)}>{id === 'day' && day === dayKey(now) ? '今日' : label}</button>)}
           </div>
+          <>{kanban ? <Kanban items={boardTasks} store={store} onSelect={select} /> : <>
           <div className="vd-task-list">{tasks.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} />)}{!tasks.length && <p className="vd-empty">タスクなし</p>}</div>
           {tab === 'day' && past.length > 0 && <div className="vd-carryover"><div className="vd-subhead"><h3>持ち越し</h3><span>{past.length}</span></div>
             {past.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} past />)}
@@ -203,6 +207,7 @@ export function Dashboard({ store, initialDate = null }: { store: DashboardStore
           {tab==='day'&&finished.length>0&&<div className="vd-finished"><div className="vd-subhead"><h3>完了したタスク</h3><span>{finished.length}</span></div>
             {finished.map(i=><ItemRow key={i.path} item={i} store={store} onSelect={select} finished/>)}
           </div>}
+          </>}</>
         </section>
         {invalid.length > 0 && <section className="vd-panel vd-unscheduled"><div className="vd-section-head"><h2>日時の確認</h2><span className="vd-count">{invalid.length}</span></div>
           {invalid.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} />)}</section>}

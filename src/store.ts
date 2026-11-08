@@ -5,6 +5,7 @@ import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
 
 export class DashboardStore {
+  kanbanEnabled = false;
   private listeners = new Set<() => void>();
   private revision = 0;
   private pending = new Map<string, Promise<unknown>>();

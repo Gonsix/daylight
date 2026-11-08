@@ -44,3 +44,21 @@ test('task and project composers render the appropriate fields with Command+Ente
   for(const label of ['親プロジェクト','作業場所','ゴール','メモ']) assert.ok(project.includes(label),label);
   assert.ok(!project.includes('datetime-local'));
 });
+
+test('kanban is controlled only by settings, hides hold/cancelled columns, and preserves task scope', async () => {
+  const result=await build({entryPoints:[path.resolve('src/Dashboard.tsx'),path.resolve('src/Kanban.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const require=createRequire(path.join(process.cwd(),'package.json'));
+  const modules=result.outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});return module.exports;});
+  const base:Item={path:'notes/A.md',title:'作業A',kind:'task',status:'todo',targetDate:'2026-11-08',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
+  const rows=[base,{...base,path:'notes/B.md',status:'on_going'}, {...base,path:'notes/C.md',status:'done',completedAt:dateTime('2026-11-08T10:00:00')}, {...base,path:'notes/H.md',status:'on_hold'}, {...base,path:'notes/X.md',status:'cancelled'}, {...base,path:'notes/Old.md',targetDate:'2026-11-07'}, {...base,path:'notes/Event.md',kind:'event'}] as Item[];
+  const store={subscribe:()=>()=>{},snapshot:()=>1,items:()=>rows,kanbanEnabled:true};
+  const html=renderToStaticMarkup(React.createElement(modules[0].Dashboard,{store,initialDate:'2026-11-08'}));
+  for(const label of ['未着手のタスク','進行中のタスク','完了のタスク','保留・中止を表示']) assert.ok(html.includes(label),label);
+  assert.ok(!html.includes('aria-label="保留のタスク"')); assert.ok(!html.includes('aria-label="中止のタスク"'));
+  assert.ok(!html.includes('vd-view-switch')); assert.ok(!html.includes('タスクの表示形式'));
+  const list=renderToStaticMarkup(React.createElement(modules[0].Dashboard,{store:{...store,kanbanEnabled:false},initialDate:'2026-11-08'}));
+  assert.ok(!list.includes('aria-label="タスクのカンバン"')); assert.ok(list.includes('vd-task-list'));
+  const day=modules[1].kanbanTasks(rows,'2026-11-08','day');
+  assert.equal(day.length,6); assert.equal(new Set(day.map((i:Item)=>i.path)).size,6); assert.ok(!day.some((i:Item)=>i.kind==='event'));
+  assert.equal(modules[1].kanbanTasks(rows,'2026-11-08','ongoing').length,1);
+});
