@@ -59,7 +59,7 @@
 .vd-completed { display: flex; align-items: center; gap: 7px; color: var(--vd-muted); font-size: 11px; white-space: nowrap; }
 .vd-completed input { width: 13px; height: 13px; margin: 0; }
 .vd-app .vd-filter-chip { display: flex; align-items: center; gap: 8px; padding: 4px 9px; border: 1px solid var(--vd-border); border-radius: 6px; color: var(--vd-text); background: var(--vd-raised); font-size: 11px; }
-.vd-layout { display: grid; grid-template-columns: minmax(260px, 1.1fr) minmax(270px, 1fr); gap: 20px; align-items: stretch; }
+.vd-layout { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(270px, 2fr); gap: 20px; align-items: stretch; }
 .vd-side { display: grid; gap: 20px; min-width: 0; }
 .vd-schedule { display: flex; flex-direction: column; min-height: 0; }
 .vd-schedule > .vd-section-head { flex: 0 0 auto; }
@@ -189,7 +189,7 @@
 .vd-app .vd-form-actions .vd-create { background: #23536b; border-color: #326982; color: #e1f5ff; }
 @media (max-width: 430px) { .vd-form-times { grid-template-columns: minmax(0,1fr); gap: 0; } }
 @container (min-width: 1150px) {
-  .vd-has-detail .vd-layout { margin-right: 350px; grid-template-columns: minmax(230px,1fr) minmax(230px,1fr); }
+  .vd-has-detail .vd-layout { margin-right: 350px; grid-template-columns: minmax(230px,1fr) minmax(230px,2fr); }
   .vd-has-detail .vd-header { margin-right: 350px; }
 }
 @container (max-width: 700px) {
