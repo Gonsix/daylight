@@ -5,7 +5,7 @@ import { dateValue, isStatus, Item, STATUS } from './model';
 import { localDateTime, PROPERTY_LABELS, PropertyChanges, propertyType, TASK_FIELDS, TaskSnapshot } from './task';
 import { submitOnCommandEnter } from './shortcuts';
 
-export function TaskProperties({ item, store, revision, onSaved }: { item:Item; store:DashboardStore; revision:number; onSaved:(path:string)=>void }) {
+export function TaskProperties({ item, store, revision, onSaved, actions }: { item:Item; store:DashboardStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode }) {
   const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(null),[changes,setChanges]=useState<PropertyChanges>({});
   const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[reset,setReset]=useState(0);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[newType,setNewType]=useState('text');
@@ -79,7 +79,7 @@ export function TaskProperties({ item, store, revision, onSaved }: { item:Item; 
         <button type="button" onClick={()=>setAdding(false)}>×</button>
       </div>:<button type="button" className="vd-add-property" onClick={()=>setAdding(true)}>＋ プロパティ</button>}
       {error&&<p className="vd-error" role="alert">{error}</p>}
-      <button type="submit" className="vd-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?'保存中…':'保存'}</button>
+      <div className="vd-detail-save-actions">{actions}<button type="submit" className="vd-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?'保存中…':'保存'}</button></div>
     </fieldset>
   </form>;
 }

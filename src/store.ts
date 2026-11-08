@@ -4,6 +4,8 @@ import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesTex
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
 
+export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; content: string }
+
 export class DashboardStore {
   kanbanEnabled = false;
   private listeners = new Set<() => void>();
@@ -85,6 +87,30 @@ export class DashboardStore {
     });
   }
   async notes(path: string) { return notesText(await this.app.vault.read(this.file(path))); }
+  private deletionKind(content: string): 'task' | 'project' {
+    const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+    const fm = match ? parseYaml(match[1]) : null;
+    const tags = (Array.isArray(fm?.tags) ? fm.tags : typeof fm?.tags === 'string' ? fm.tags.split(/[,\s]+/) : [])
+      .filter((t: unknown): t is string => typeof t === 'string').map((t: string) => t.replace(/^#/, ''));
+    const kinds = (['task', 'project', 'event'] as const).filter(k => tags.includes(k));
+    if (kinds.length !== 1 || kinds[0] === 'event') throw new Error('タスクまたはプロジェクトのノートを選び直してください。');
+    return kinds[0];
+  }
+  async loadDeleteSnapshot(item: Item): Promise<DeleteSnapshot> {
+    const content = await this.app.vault.read(this.file(item.path));
+    const kind = this.deletionKind(content);
+    if (kind !== item.kind) throw new Error('ノートの種類が変わっています。詳細を開き直してください。');
+    return { path: item.path, kind, content };
+  }
+  async deleteNote(snapshot: DeleteSnapshot) {
+    await this.queue('__event_mutations__', () => this.queue(snapshot.path, async () => {
+      const file = this.file(snapshot.path), content = await this.app.vault.read(file);
+      if (content !== snapshot.content) throw new Error('ノートが更新されています。削除画面を開き直してください。');
+      if (this.deletionKind(content) !== snapshot.kind) throw new Error('ノートの種類が変わっています。');
+      await this.app.fileManager.trashFile(file);
+      this.overrides.delete(snapshot.path); this.invalidate();
+    }));
+  }
   async open(path: string) { await this.app.workspace.getLeaf('tab').openFile(this.file(path)); }
   private projectLink(path: string): string {
     if (!path) return '';

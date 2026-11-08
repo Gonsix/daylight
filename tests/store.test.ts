@@ -270,3 +270,35 @@ test('invalid task/project input and stale relation targets never create notes',
   await assert.rejects(()=>store.createProject(projectInput),/Projectテンプレートが見つかりません/);
   assert.equal(files.length,count);
 });
+
+test('task and project deletion uses trash and preserves related notes', async () => {
+  for (const kind of ['task','project']) {
+    const {store,task,project,bodies,trashed,fm}=await fixture();
+    bodies.set(project.path,`---\n${JSON.stringify(fm.get(project.path))}\n---\n\n## ゴール\n内容\n`);
+    const target=kind==='task'?task:project;
+    const related=kind==='task'?project:task;
+    const original=bodies.get(target.path), relatedBody=bodies.get(related.path);
+    const item=store.items().find((i:any)=>i.path===target.path);
+    const snapshot=await store.loadDeleteSnapshot(item);
+    await store.deleteNote(snapshot);
+    assert.equal(trashed.get(target.path),original);
+    assert.equal(bodies.get(related.path),relatedBody);
+    assert.ok(fm.has(related.path));
+    assert.ok(!store.items().some((i:any)=>i.path===target.path));
+  }
+});
+test('deletion rejects stale content, wrong identity, missing notes and trash failures', async () => {
+  const {store,task,bodies,trashed,app}=await fixture();
+  const item=store.items().find((i:any)=>i.path===task.path);
+  const snapshot=await store.loadDeleteSnapshot(item);
+  bodies.set(task.path,snapshot.content+'external memo');
+  await assert.rejects(()=>store.deleteNote(snapshot),/更新されています/);
+  assert.equal(trashed.size,0);
+  bodies.set(task.path,snapshot.content);
+  await assert.rejects(()=>store.loadDeleteSnapshot({...item,kind:'project'}),/種類が変わっています/);
+  await assert.rejects(()=>store.deleteNote({...snapshot,kind:'project'}),/種類が変わっています/);
+  await assert.rejects(()=>store.deleteNote({...snapshot,path:'daily_notes/01_daily/not-a-task.md'}),/見つかりません/);
+  app.fileManager.trashFile=async()=>{throw new Error('trash unavailable');};
+  await assert.rejects(()=>store.deleteNote(snapshot),/trash unavailable/);
+  assert.equal(bodies.get(task.path),snapshot.content); assert.equal(trashed.size,0);
+});

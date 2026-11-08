@@ -6,6 +6,7 @@ import { TimeSelection } from './TimeSelection';
 import { openEditEventModal, openEventModal } from './EventModal';
 import { rangeDateTimes } from './event';
 import { openTaskModal, openProjectModal } from './CreateModal';
+import { openDeleteNoteModal } from './DeleteNoteModal';
 import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
 import { submitOnCommandEnter } from './shortcuts';
@@ -131,7 +132,7 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
       <button className="vd-icon-button" aria-label="詳細を閉じる" onClick={onClose}><Icon name="close" /></button>
     </div>
     <h2 tabIndex={-1} ref={heading}>{item.title}</h2>
-    {item.kind==='task'?<TaskProperties item={item} store={store} revision={revision} onSaved={onRetarget}/>:<>
+    {item.kind==='task'?<TaskProperties item={item} store={store} revision={revision} onSaved={onRetarget} actions={<button type="button" className="vd-detail-delete" onClick={() => openDeleteNoteModal(store,item,onClose)}>削除</button>}/>:<>
     <StatusSelect item={item} store={store} />
     <dl className="vd-detail-meta">
       {item.projectLabel && <><dt>プロジェクト</dt><dd>{item.projectLabel}</dd></>}
@@ -151,7 +152,7 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
     }}>
       <textarea value={draft} onChange={e => onDraft(e.target.value)} aria-label="メモを追記" placeholder="メモを追記…" rows={4} />
       {error && <p className="vd-error" role="alert">{error}</p>}
-      <button className="vd-save" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !draft.trim()}>{busy ? '保存中…' : '追加'}</button>
+      <div className="vd-detail-save-actions">{item.kind === 'project' && <button type="button" className="vd-detail-delete" disabled={busy} onClick={() => openDeleteNoteModal(store,item,onClose)}>削除</button>}<button className="vd-save" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !draft.trim()}>{busy ? '保存中…' : '追加'}</button></div>
     </form>
   </aside>;
 }
