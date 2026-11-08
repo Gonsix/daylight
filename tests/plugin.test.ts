@@ -1,0 +1,82 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import path from 'node:path';
+import vm from 'node:vm';
+import { createRequire } from 'node:module';
+
+async function loadPlugin(saved: any = null, existing: any[] = []) {
+  const result=await build({entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const registrations:any={};
+  class Plugin {
+    app:any; registerEvent() {} register(callback:any) { registrations.cleanup = callback; }
+    async loadData() { return saved; }
+    async saveData(data:any) { registrations.saved = { ...data }; }
+    addSettingTab(tab:any) { registrations.settingsTab = tab; }
+    registerView(type:string,factory:any){registrations.view={type,factory};}
+    addRibbonIcon(_icon:string,_label:string,callback:any){registrations.ribbon=callback;}
+    addCommand(command:any){registrations.command=command;}
+    registerMarkdownCodeBlockProcessor(type:string,callback:any){registrations.markdown={type,callback};}
+  }
+  class MarkdownRenderChild { constructor(public containerEl:any){} }
+  const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console,Intl,Date,
+    require:(id:string)=>id==='obsidian'?{addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class{},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
+  const plugin=new module.exports.default();
+  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({})},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=callback;},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
+  await plugin.onload();
+  return { plugin, registrations };
+}
+
+test('plugin loads and registers independent view, command and date-aware Markdown embeds', async () => {
+  const { registrations } = await loadPlugin();
+  assert.equal(registrations.view.type,'vault-dashboard');assert.equal(registrations.markdown.type,'vault-dashboard');
+  registrations.command.callback();await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(registrations.opened.type,'vault-dashboard');
+  let child:any;let error='';
+  const el={createEl:(_tag:string,props:any)=>{error=props.text;}};
+  const ctx={sourcePath:'daily_notes/01_daily/2026-11-06.md',addChild:(value:any)=>{child=value;}};
+  registrations.markdown.callback('',el,ctx);assert.equal(child.date,'2026-11-06');
+  registrations.markdown.callback('date: today',el,ctx);assert.equal(child.date,null);
+  registrations.markdown.callback('date: "2026-11-07"',el,ctx);assert.equal(child.date,'2026-11-07');
+  registrations.markdown.callback('date: "2026-02-30"',el,ctx);assert.ok(error.includes('YYYY-MM-DD'));
+});
+
+
+test('startup waits for layout readiness and reuses the restored dashboard tab', async () => {
+  const existing = {};
+  const { registrations } = await loadPlugin({ openOnStartup: true }, [existing]);
+  assert.equal(registrations.revealed, undefined);
+  registrations.ready();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(registrations.revealed, existing);
+  assert.equal(registrations.opened, undefined);
+});
+
+test('startup opens a dedicated tab when enabled and none was restored', async () => {
+  const { registrations } = await loadPlugin({ openOnStartup: true });
+  registrations.ready();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(registrations.opened.type, 'vault-dashboard');
+  assert.equal(registrations.opened.active, true);
+});
+
+test('startup stays off by default, for disabled or invalid settings, and after unload', async () => {
+  for (const saved of [null, { openOnStartup: false }, { openOnStartup: 'true' }]) {
+    const { registrations } = await loadPlugin(saved);
+    registrations.ready();
+    assert.equal(registrations.opened, undefined);
+  }
+  const { registrations } = await loadPlugin({ openOnStartup: true });
+  registrations.cleanup();
+  registrations.ready();
+  assert.equal(registrations.opened, undefined);
+});
+
+test('startup preference is persisted', async () => {
+  const { plugin, registrations } = await loadPlugin();
+  assert.ok(registrations.settingsTab);
+  plugin.settings.openOnStartup = true;
+  await plugin.saveSettings();
+  assert.equal(registrations.saved.openOnStartup, true);
+});

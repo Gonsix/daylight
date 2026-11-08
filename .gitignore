@@ -1,0 +1,22 @@
+node_modules/
+
+# Local Obsidian plugin settings
+data.json
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs, caches, and test output
+*.log
+*.tsbuildinfo
+.cache/
+coverage/
+
+# Local environment variables
+.env
+.env.*
+!.env.example
