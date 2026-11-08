@@ -37,7 +37,6 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
     }}>
       <span>{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(dayStart(day))}</span>
       <span className="vd-weekday">{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(dayStart(day))}</span>
-      <svg className="vd-date-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
     </button>
     {open && <div className="vd-calendar-popover" ref={popup} role="dialog" aria-label="日付を選択" aria-modal="false">
       <div className="vd-calendar-head">

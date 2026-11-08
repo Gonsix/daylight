@@ -34,7 +34,6 @@
 .vd-app button.vd-date { position: relative; display: flex; align-items: baseline; gap: 9px; padding: 0 4px; font-size: 23px; font-weight: 600; letter-spacing: -.04em; cursor: pointer; background: transparent; border: 0; color: var(--vd-text); }
 .vd-weekday { color: var(--vd-muted); font-size: 12px; font-weight: 400; letter-spacing: 0; }
 .vd-datepicker { position: relative; }
-.vd-date-chevron { color: var(--vd-muted); align-self: center; margin-left: 2px; }
 .vd-calendar-popover { position: absolute; z-index: 20; top: calc(100% + 14px); left: -36px; width: min(312px, calc(100cqw - 36px)); padding: 12px; border: 1px solid var(--vd-border); border-radius: 10px; background: var(--vd-surface); box-shadow: 0 14px 45px #00000040; }
 .vd-calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 12px; }
 .vd-calendar-month { display: flex; align-items: center; gap: 2px; }
