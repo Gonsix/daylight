@@ -261,3 +261,7 @@
 .vd-detail > .vd-work-duration { margin-bottom: 16px; color: var(--vd-muted); font-size: 12px; }
 .vd-slot.vd-slot-actual { border: 1px solid var(--vd-state); border-left-width: 3px; background: color-mix(in srgb, var(--vd-state) 22%, var(--vd-bg)); }
 .vd-slot-actual.is-running { border-bottom-width: 2px; }
+
+.vd-kanban-work-times { display: flex; align-items: center; gap: 7px; color: var(--vd-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.vd-kanban-work-times svg { flex-shrink: 0; }
+.vd-work-arrow { margin-inline: 3px; opacity: .7; }
