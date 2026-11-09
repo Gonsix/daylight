@@ -34,3 +34,12 @@ test('hold/cancel/done stop an open work block while only done records completio
   const old={status:'done',task_start:'2026-11-09T09:00:00',task_end:'2026-11-09T09:30:00'};
   recordWorkStatus(old,'on_hold',now);assert.equal(old.task_end,'2026-11-09T09:30:00');
 });
+
+test('todo clears work bounds and ongoing reopens the saved interval',()=>{
+  const start='2026-11-09T09:00:00',end='2026-11-09T10:00:00';
+  const reset={status:'todo',task_start:start,task_end:end,'completed at':end};
+  recordWorkStatus(reset,'done');assert.equal(reset.task_start,null);assert.equal(reset.task_end,null);assert.equal(reset['completed at'],null);
+  const resumed={status:'on_going',task_start:start,task_end:end,'completed at':end};
+  recordWorkStatus(resumed,'done');assert.equal(resumed.task_start,start);assert.equal(resumed.task_end,null);assert.equal(resumed['completed at'],null);
+  assert.equal(isTaskRunning(item({taskStart:dateTime(resumed.task_start),taskEnd:null})),true);
+});

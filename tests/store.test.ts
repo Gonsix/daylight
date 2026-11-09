@@ -337,3 +337,20 @@ test('holding stops the actual block and resuming preserves its original start a
   await store.startTask(row());assert.equal(fm.get(task.path).task_start,original);assert.equal(fm.get(task.path).task_end,null);assert.equal(fm.get(task.path).status,'on_going');
   await store.setStatus(row(),'done');assert.ok(fm.get(task.path).task_end);assert.ok(fm.get(task.path)['completed at']);assert.equal(fm.get(task.path).schedule_start,'2026-11-06T09:00:00');
 });
+
+test('returning to ongoing clears only actual end; returning to todo resets both without changing schedule',async()=>{
+  for(const target of ['todo','on_going']) {
+    const {store,task,fm}=await fixture();const row=()=>store.items().find((i:any)=>i.path===task.path);
+    await store.startTask(row());await store.finishTask(row());
+    const completed={...fm.get(task.path)};
+    await store.setStatus(row(),target);
+    const result=fm.get(task.path);
+    assert.equal(result.task_start,target==='todo'?null:completed.task_start);
+    assert.equal(result.task_end,null);assert.equal(result['completed at'],null);
+    assert.equal(result.schedule_start,completed.schedule_start);assert.equal(result.schedule_end,completed.schedule_end);
+    assert.equal(result.project,completed.project);assert.equal(result.custom,'preserve');
+    if(target==='todo') {
+      await store.startTask(row());assert.ok(fm.get(task.path).task_start);assert.equal(fm.get(task.path).task_end,null);
+    }
+  }
+});

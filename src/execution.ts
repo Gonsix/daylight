@@ -8,9 +8,13 @@ export function workDuration(item: Item): string | null {
   const minutes = Math.floor((item.taskEnd - item.taskStart) / 60000);
   return `${String(Math.floor(minutes / 60)).padStart(2,'0')}:${String(minutes % 60).padStart(2,'0')}`;
 }
-/** Finish/hold/cancel an open work interval through any status control. */
+/** Keep actual work timestamps consistent with status transitions. */
 export function recordWorkStatus(fm: Record<string,unknown>, previous: unknown, now = Date.now()) {
-  if (fm.status !== 'on_going' && dateTime(fm.task_start) !== null && !fm.task_end) {
+  if (fm.status === 'todo') {
+    fm.task_start = null; fm.task_end = null;
+  } else if (fm.status === 'on_going') {
+    fm.task_end = null;
+  } else if (dateTime(fm.task_start) !== null && !fm.task_end) {
     const start = dateTime(fm.task_start)!;
     if (now < start) throw new Error('作業終了が開始時刻より前になっています。');
     fm.task_end = localTimestamp(now);
