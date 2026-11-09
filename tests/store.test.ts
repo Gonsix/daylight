@@ -58,7 +58,7 @@ async function fixture() {
       trashFile: async (f:File) => {trashed.set(f.path,bodies.get(f.path)!);files.splice(files.indexOf(f),1);fm.delete(f.path);bodies.delete(f.path);},
     },
   };
-  const store = new module.exports.DashboardStore(app, { registerEvent() {}, register() {} });
+  const store = new module.exports.DaylightStore(app, { registerEvent() {}, register() {} });
   return { store, fm, bodies, task, project, files, app, trashed, renames };
 }
 test('frontmatter kinds, project resolution, scheduled tasks and scope', async () => {

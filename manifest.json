@@ -1,6 +1,6 @@
 {
-  "id": "vault-dashboard",
-  "name": "Vault Dashboard",
+  "id": "daylight",
+  "name": "Daylight",
   "version": "0.1.0",
   "minAppVersion": "1.8.7",
   "description": "Daily timeline, tasks and projects with inline status and notes.",

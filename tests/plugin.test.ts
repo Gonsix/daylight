@@ -16,7 +16,7 @@ async function loadPlugin(saved: any = null, existing: any[] = []) {
     registerView(type:string,factory:any){registrations.view={type,factory};}
     addRibbonIcon(_icon:string,_label:string,callback:any){registrations.ribbon=callback;}
     addCommand(command:any){registrations.command=command;}
-    registerMarkdownCodeBlockProcessor(type:string,callback:any){registrations.markdown={type,callback};}
+    registerMarkdownCodeBlockProcessor(type:string,callback:any){registrations.markdown={type,callback};(registrations.markdowns??={})[type]=callback;}
   }
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
@@ -30,9 +30,13 @@ async function loadPlugin(saved: any = null, existing: any[] = []) {
 
 test('plugin loads and registers independent view, command and date-aware Markdown embeds', async () => {
   const { registrations } = await loadPlugin();
-  assert.equal(registrations.view.type,'vault-dashboard');assert.equal(registrations.markdown.type,'vault-dashboard');
+  assert.equal(registrations.view.type,'daylight');assert.equal(registrations.markdown.type,'daylight');
+  assert.equal(registrations.view.factory({}).getDisplayText(),'Daylight');
+  assert.equal(registrations.command.id,'open-daylight');
+  assert.equal(registrations.command.name,'Daylightを開く');
+  assert.equal(typeof registrations.markdowns['vault-dashboard'],'function');
   registrations.command.callback();await new Promise(resolve=>setTimeout(resolve,0));
-  assert.equal(registrations.opened.type,'vault-dashboard');
+  assert.equal(registrations.opened.type,'daylight');
   let child:any;let error='';
   const el={createEl:(_tag:string,props:any)=>{error=props.text;}};
   const ctx={sourcePath:'daily_notes/01_daily/2026-11-06.md',addChild:(value:any)=>{child=value;}};
@@ -57,7 +61,7 @@ test('startup opens a dedicated tab when enabled and none was restored', async (
   const { registrations } = await loadPlugin({ openOnStartup: true });
   registrations.ready();
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(registrations.opened.type, 'vault-dashboard');
+  assert.equal(registrations.opened.type, 'daylight');
   assert.equal(registrations.opened.active, true);
 });
 

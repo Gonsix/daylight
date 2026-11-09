@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { parseYaml, stringifyYaml } from 'obsidian';
-import { DashboardStore } from './store';
+import { DaylightStore } from './store';
 import { dateValue, isStatus, Item, STATUS } from './model';
 import { localDateTime, PROPERTY_LABELS, PropertyChanges, propertyType, TASK_FIELDS, TaskSnapshot } from './task';
 import { submitOnCommandEnter } from './shortcuts';
 
-export function TaskProperties({ item, store, revision, onSaved, actions }: { item:Item; store:DashboardStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode }) {
+export function TaskProperties({ item, store, revision, onSaved, actions }: { item:Item; store:DaylightStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode }) {
   const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(null),[changes,setChanges]=useState<PropertyChanges>({});
   const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[newType,setNewType]=useState('text');
@@ -19,7 +19,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     return ()=>{cancelled=true;};
   },[item.path,revision]);
   const change=(key:string,value:unknown)=>{dirty.current=true;setChanges(prev=>({...prev,[key]:value}));setError('');};
-  if(!snapshot)return <div className="vd-task-properties"><p className={error?'vd-error':'vd-property-loading'}>{error||'読み込み中…'}</p></div>;
+  if(!snapshot)return <div className="daylight-task-properties"><p className={error?'daylight-error':'daylight-property-loading'}>{error||'読み込み中…'}</p></div>;
   const keys=Array.from(new Set([...TASK_FIELDS,...Object.keys(snapshot.properties),...Object.keys(changes)]));
   const value=(key:string)=>Object.hasOwn(changes,key)?changes[key]:snapshot.properties[key]??null;
   const type=(key:string)=>propertyType(key,snapshot.properties[key],types[key]||snapshot.types[key]);
@@ -39,16 +39,16 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
         {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>;
     } else if(kind==='boolean')control=<select value={current===null?'':String(current)} aria-label={label} onChange={e=>change(key,e.target.value===''?null:e.target.value==='true')}><option value="">未設定</option><option value="true">はい</option><option value="false">いいえ</option></select>;
     else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder="1行に1項目" value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.target.value)} />;
-    else if(kind==='yaml')control=<textarea className="vd-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.target.value)} />;
+    else if(kind==='yaml')control=<textarea className="daylight-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.target.value)} />;
     else if(kind==='datetime') {
       const local=localDateTime(current);
       control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>change(key,e.target.value||null)} />;
     } else if(kind==='date')control=<input type="date" aria-label={label} value={dateValue(current)} onChange={e=>change(key,e.target.value||null)} />;
     else if(kind==='number')control=<input type="number" step="any" aria-label={label} value={text} onChange={e=>change(key,e.target.value)} />;
     else control=<input type="text" aria-label={label} value={text} onChange={e=>change(key,e.target.value)} />;
-    return <label className="vd-form-field vd-property-field" key={key}><span>{label}{kind==='yaml'&&<small>YAML</small>}</span>{control}</label>;
+    return <label className="daylight-form-field daylight-property-field" key={key}><span>{label}{kind==='yaml'&&<small>YAML</small>}</span>{control}</label>;
   };
-  return <form className="vd-task-properties" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current)} onSubmit={async e=>{
+  return <form className="daylight-task-properties" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current)} onSubmit={async e=>{
     e.preventDefault();if(saving.current)return;
     const patch:PropertyChanges={...changes};
     try {
@@ -67,18 +67,18 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     } catch(e){if(mounted.current)setError(saved?'保存済みです。詳細を開き直してください。':(e as Error).message.replaceAll('再読み込みしてください。','詳細を開き直してください。'));}
     finally {saving.current=false;if(mounted.current)setBusy(false);}
   }}>
-    <div className="vd-property-header"><h3>プロパティ</h3></div>
-    <fieldset disabled={busy} className="vd-event-fields">
+    <div className="daylight-property-header"><h3>プロパティ</h3></div>
+    <fieldset disabled={busy} className="daylight-event-fields">
       {TASK_FIELDS.map(field)}
-      <div className="vd-extra-properties">{keys.filter(k=>!TASK_FIELDS.includes(k)).map(field)}</div>
-      {adding?<div className="vd-new-property">
+      <div className="daylight-extra-properties">{keys.filter(k=>!TASK_FIELDS.includes(k)).map(field)}</div>
+      {adding?<div className="daylight-new-property">
         <input autoFocus aria-label="新しいプロパティ名" placeholder="プロパティ名" value={name} onChange={e=>setName(e.target.value)} />
         <select aria-label="新しいプロパティの種類" value={newType} onChange={e=>setNewType(e.target.value)}>{[['text','テキスト'],['number','数値'],['boolean','チェック'],['date','日付'],['datetime','日時'],['list','リスト'],['yaml','構造化データ']].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
         <button type="button" onClick={()=>{const key=name.trim();if(!key||keys.includes(key)||/[\r\n\0]/.test(key)){setError('重複しないプロパティ名を入力してください。');return;}setTypes(prev=>({...prev,[key]:newType==='boolean'?'checkbox':newType}));change(key,newType==='yaml'?{}:newType==='list'?[]:null);setAdding(false);setName('');}}>追加</button>
         <button type="button" onClick={()=>setAdding(false)}>×</button>
-      </div>:<button type="button" className="vd-add-property" onClick={()=>setAdding(true)}>＋ プロパティ</button>}
-      {error&&<p className="vd-error" role="alert">{error}</p>}
-      <div className="vd-detail-save-actions">{actions}<button type="submit" className="vd-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?'保存中…':'保存'}</button></div>
+      </div>:<button type="button" className="daylight-add-property" onClick={()=>setAdding(true)}>＋ プロパティ</button>}
+      {error&&<p className="daylight-error" role="alert">{error}</p>}
+      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?'保存中…':'保存'}</button></div>
     </fieldset>
   </form>;
 }

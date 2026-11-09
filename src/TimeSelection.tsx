@@ -65,10 +65,10 @@ export function TimeSelection({ day, scroller, onConfirm, children }: {
     if (frame.current !== null) layer.current?.ownerDocument.defaultView?.cancelAnimationFrame(frame.current);
   }, []);
   const label = range ? `${timeLabel(dayStart(day) + range.start * 60000)}–${range.end === 1440 ? '24:00' : timeLabel(dayStart(day) + range.end * 60000)}` : '';
-  return <div className={`vd-events${dragging ? ' is-selecting' : ''}`} ref={layer} style={{ height: 1440 }} tabIndex={-1}
+  return <div className={`daylight-events${dragging ? ' is-selecting' : ''}`} ref={layer} style={{ height: 1440 }} tabIndex={-1}
     onKeyDownCapture={e=>confirmRangeOnEnter(e,confirm,!current.current||!!active.current)}
     onPointerDown={e => {
-      if ((e.target as Element).closest('.vd-slot, .vd-selection, .vd-selection-tools, button, select')) return;
+      if ((e.target as Element).closest('.daylight-slot, .daylight-selection, .daylight-selection-tools, button, select')) return;
       if (e.pointerType === 'touch') { tap.current = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
       begin(e, 'create');
     }}
@@ -84,20 +84,20 @@ export function TimeSelection({ day, scroller, onConfirm, children }: {
     onLostPointerCapture={e => { if (e.target === e.currentTarget && active.current) clear(); }}>
     {children}
     {range && <>
-      <div className="vd-selection" style={{ top: range.start, height: range.end - range.start }} onPointerDown={e => begin(e, 'move')}>
-        <button className="vd-range-handle vd-range-start" aria-label="開始時刻を調整" onPointerDown={e => begin(e, 'start')} onKeyDown={e => {
+      <div className="daylight-selection" style={{ top: range.start, height: range.end - range.start }} onPointerDown={e => begin(e, 'move')}>
+        <button className="daylight-range-handle daylight-range-start" aria-label="開始時刻を調整" onPointerDown={e => begin(e, 'start')} onKeyDown={e => {
           if (['ArrowUp','ArrowDown'].includes(e.key)) { e.preventDefault(); update(adjustRange(range,'start',0,range.start+(e.key==='ArrowUp'?-TIME_STEP:TIME_STEP))); }
         }} />
-        <button className="vd-range-handle vd-range-end" aria-label="終了時刻を調整" onPointerDown={e => begin(e, 'end')} onKeyDown={e => {
+        <button className="daylight-range-handle daylight-range-end" aria-label="終了時刻を調整" onPointerDown={e => begin(e, 'end')} onKeyDown={e => {
           if (['ArrowUp','ArrowDown'].includes(e.key)) { e.preventDefault(); update(adjustRange(range,'end',0,range.end+(e.key==='ArrowUp'?-TIME_STEP:TIME_STEP))); }
         }} />
       </div>
-      {!dragging && <div className="vd-selection-tools" style={{ top: range.start >= 42 ? range.start - 38 : range.end + 8 }}>
+      {!dragging && <div className="daylight-selection-tools" style={{ top: range.start >= 42 ? range.start - 38 : range.end + 8 }}>
         <span>{label}</span><button onClick={confirm} aria-keyshortcuts="Enter" title="Enterで予定を追加">予定を追加</button>
-        <button className="vd-range-cancel" aria-label="範囲選択をキャンセル" onClick={clear}>×</button>
+        <button className="daylight-range-cancel" aria-label="範囲選択をキャンセル" onClick={clear}>×</button>
       </div>}
-      {dragging && <span className="vd-selection-time" style={{ top: range.start + 4 }}>{label}</span>}
-      <span className="vd-sr-only" role="status" aria-live="polite">{label}</span>
+      {dragging && <span className="daylight-selection-time" style={{ top: range.start + 4 }}>{label}</span>}
+      <span className="daylight-sr-only" role="status" aria-live="polite">{label}</span>
     </>}
   </div>;
 }

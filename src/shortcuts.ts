@@ -15,6 +15,6 @@ export function confirmRangeOnEnter(event:KeyboardEvent<HTMLDivElement>,confirm:
   if(blocked||!['Enter','Return'].includes(event.key)||event.metaKey||event.ctrlKey||event.altKey||event.shiftKey
     ||event.nativeEvent.isComposing||event.keyCode===229||event.repeat||event.defaultPrevented)return;
   const target=event.target as Element;
-  if(target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), .vd-range-cancel, .vd-slot'))return;
+  if(target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), .daylight-range-cancel, .daylight-slot'))return;
   event.preventDefault();event.stopPropagation();confirm();
 }

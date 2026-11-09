@@ -31,31 +31,31 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
   const thisYear = Number(today.slice(0,4));
   const years = Array.from(new Set([...Array.from({ length: 101 }, (_, i) => thisYear - 50 + i), year])).sort((a,b) => a-b);
   const changeMonth = (value: string) => { setMonth(value); setFocused(value.slice(0,7) + '-01'); };
-  return <div className="vd-datepicker" ref={host}>
-    <button className="vd-date" ref={trigger} aria-label="日付を選択" aria-haspopup="dialog" aria-expanded={open} onClick={() => {
+  return <div className="daylight-datepicker" ref={host}>
+    <button className="daylight-date" ref={trigger} aria-label="日付を選択" aria-haspopup="dialog" aria-expanded={open} onClick={() => {
       if (!open) { setMonth(day); setFocused(day); } setOpen(!open);
     }}>
       <span>{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(dayStart(day))}</span>
-      <span className="vd-weekday">{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(dayStart(day))}</span>
+      <span className="daylight-weekday">{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(dayStart(day))}</span>
     </button>
-    {open && <div className="vd-calendar-popover" ref={popup} role="dialog" aria-label="日付を選択" aria-modal="false">
-      <div className="vd-calendar-head">
-        <button className="vd-icon-button" aria-label="前の月" onClick={() => changeMonth(moveMonth(month.slice(0,7) + '-01', -1))}><Chevron /></button>
-        <div className="vd-calendar-month">
+    {open && <div className="daylight-calendar-popover" ref={popup} role="dialog" aria-label="日付を選択" aria-modal="false">
+      <div className="daylight-calendar-head">
+        <button className="daylight-icon-button" aria-label="前の月" onClick={() => changeMonth(moveMonth(month.slice(0,7) + '-01', -1))}><Chevron /></button>
+        <div className="daylight-calendar-month">
           <select aria-label="年" value={year} onChange={e => changeMonth(`${e.target.value}-${String(monthIndex).padStart(2,'0')}-01`)}>{years.map(y => <option key={y} value={y}>{y}年</option>)}</select>
           <select aria-label="月" value={monthIndex} onChange={e => changeMonth(`${year}-${e.target.value.padStart(2,'0')}-01`)}>{Array.from({length:12},(_,i) => <option key={i} value={i+1}>{i+1}月</option>)}</select>
         </div>
-        <button className="vd-icon-button" aria-label="次の月" onClick={() => changeMonth(moveMonth(month.slice(0,7) + '-01', 1))}><Chevron right /></button>
+        <button className="daylight-icon-button" aria-label="次の月" onClick={() => changeMonth(moveMonth(month.slice(0,7) + '-01', 1))}><Chevron right /></button>
       </div>
-      <div className="vd-calendar-grid" role="grid" aria-label={`${year}年${monthIndex}月`}>
-        <div role="row" className="vd-calendar-weekdays">{weekdays.map(w => <span role="columnheader" key={w}>{w}</span>)}</div>
-        {Array.from({length:6},(_,week) => <div className="vd-calendar-week" role="row" key={week}>
+      <div className="daylight-calendar-grid" role="grid" aria-label={`${year}年${monthIndex}月`}>
+        <div role="row" className="daylight-calendar-weekdays">{weekdays.map(w => <span role="columnheader" key={w}>{w}</span>)}</div>
+        {Array.from({length:6},(_,week) => <div className="daylight-calendar-week" role="row" key={week}>
           {cells.slice(week*7,week*7+7).map(date => {
             const count = counts.get(date) ?? 0;
             return <button key={date} type="button" role="gridcell" data-day={date} aria-selected={date===day} aria-current={date===today ? 'date' : undefined}
               aria-label={`${Number(date.slice(0,4))}年${Number(date.slice(5,7))}月${Number(date.slice(8))}日${count ? `・${count}件` : ''}`}
               tabIndex={date===focused ? 0 : -1}
-              className={`vd-calendar-day${date.slice(0,7)!==month.slice(0,7) ? ' is-outside' : ''}${date===today ? ' is-today' : ''}${date===day ? ' is-selected' : ''}`}
+              className={`daylight-calendar-day${date.slice(0,7)!==month.slice(0,7) ? ' is-outside' : ''}${date===today ? ' is-today' : ''}${date===day ? ' is-selected' : ''}`}
               onClick={() => choose(date)} onFocus={() => setFocused(date)}
               onKeyDown={e => {
                 let next: string | null = null;
@@ -69,12 +69,12 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
                 if (e.key==='PageDown') next=moveMonth(date,1);
                 if (next) { e.preventDefault(); setMonth(next); setFocused(next); }
               }}>
-              <span>{Number(date.slice(8))}</span><span className="vd-calendar-dots" aria-hidden="true">{Array.from({length:Math.min(3,count)},(_,i)=><i key={i} />)}</span>
+              <span>{Number(date.slice(8))}</span><span className="daylight-calendar-dots" aria-hidden="true">{Array.from({length:Math.min(3,count)},(_,i)=><i key={i} />)}</span>
             </button>;
           })}
         </div>)}
       </div>
-      <div className="vd-calendar-shortcuts"><button onClick={() => choose(moveDay(today,-1))}>昨日</button><button onClick={() => choose(null)}>今日</button><button onClick={() => choose(moveDay(today,1))}>明日</button></div>
+      <div className="daylight-calendar-shortcuts"><button onClick={() => choose(moveDay(today,-1))}>昨日</button><button onClick={() => choose(null)}>今日</button><button onClick={() => choose(moveDay(today,1))}>明日</button></div>
     </div>}
   </div>;
 }

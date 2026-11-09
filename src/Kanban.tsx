@@ -2,7 +2,7 @@ import React, { CSSProperties, useMemo, useRef, useState } from 'react';
 import { Notice, Platform } from 'obsidian';
 import { childTasks, canParent } from './hierarchy';
 import { isTaskRunning, workDuration } from './execution';
-import { DashboardStore } from './store';
+import { DaylightStore } from './store';
 import { carryovers, completedTasks, dayKey, filterTasks, isStatus, Item, localTimestamp, STATUS, Status, TaskTab, timeLabel } from './model';
 
 const kanbanColor = (status:string) => status === 'todo' ? '#3fb950' : status === 'on_going' ? '#d29922' : status === 'done' ? '#a371f7' : isStatus(status) ? STATUS[status].color : '#94a3b8';
@@ -16,7 +16,7 @@ export function kanbanTasks(items: Item[], day: string, tab: TaskTab): Item[] {
   if (tab === 'day') rows.push(...carryovers(items,day).filter(i => i.kind === 'task'),...completedTasks(items,day));
   return [...new Map(rows.map(i => [i.path,i])).values()];
 }
-export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: { items: Item[]; allItems?: Item[]; store: DashboardStore; onSelect: (path: string) => void; onAddTask?: (status: Status) => void }) {
+export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: { items: Item[]; allItems?: Item[]; store: DaylightStore; onSelect: (path: string) => void; onAddTask?: (status: Status) => void }) {
   const [showOther,setShowOther] = useState(false), [over,setOver] = useState(''), [busy,setBusy] = useState<string | null>(null);
   const [menu,setMenu] = useState<string | null>(null), [query,setQuery] = useState('');
   const dragged = useRef<Item | null>(null), saving = useRef(false);
@@ -66,52 +66,52 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
     const child=dragged.current;dragged.current=null;setParentOver('');setOver('');
     if(child && canParent(allItems,child.path,target.path)) void assignParent(child,target.path);
   };
-  return <div className="vd-kanban-wrap">
-    <div className="vd-kanban-tools"><label className="vd-kanban-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" aria-label="カンバン内のタスクを検索" placeholder="タスク名・プロジェクトで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" aria-expanded={showOther} onClick={() => setShowOther(v => !v)}>{showOther ? '保留・中止を隠す' : '保留・中止を表示'}{otherCount > 0 ? ` (${otherCount})` : ''}</button></div>
-    <div className={`vd-kanban${Platform?.isPhone ? ' vd-kanban-phone' : ''}`} aria-label="タスクのカンバン" tabIndex={0}>
+  return <div className="daylight-kanban-wrap">
+    <div className="daylight-kanban-tools"><label className="daylight-kanban-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" aria-label="カンバン内のタスクを検索" placeholder="タスク名・プロジェクトで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" aria-expanded={showOther} onClick={() => setShowOther(v => !v)}>{showOther ? '保留・中止を隠す' : '保留・中止を表示'}{otherCount > 0 ? ` (${otherCount})` : ''}</button></div>
+    <div className={`daylight-kanban${Platform?.isPhone ? ' daylight-kanban-phone' : ''}`} aria-label="タスクのカンバン" tabIndex={0}>
       {columns.map(status => {
         const rows = visibleItems.filter(i => status === 'unknown' ? !isStatus(i.status) : i.status === status);
         const label = isStatus(status) ? STATUS[status].label : '状態未設定';
         const color = kanbanColor(status);
-        return <section key={status} className={`vd-kanban-column${over === status ? ' is-over' : ''}`} aria-label={`${label}のタスク`}
-          style={{'--vd-state':color} as CSSProperties}
+        return <section key={status} className={`daylight-kanban-column${over === status ? ' is-over' : ''}`} aria-label={`${label}のタスク`}
+          style={{'--daylight-state':color} as CSSProperties}
           onDragOver={e => { if (dragged.current && isStatus(status) && !saving.current) { e.preventDefault(); e.dataTransfer.dropEffect='move'; setOver(status); } }}
           onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(''); }}
           onDrop={e => { e.preventDefault(); const item=dragged.current; dragged.current=null; setOver(''); if (item && isStatus(status)) void move(item,status); }}>
           <h3>{label}<span>{rows.length}</span></h3>
-          {rows.map(item => <article key={item.path} className={`vd-kanban-card${parentOver === item.path ? ' is-parent-target' : ''}`} onDragOver={e=>parentDragOver(e,item)} onDrop={e=>parentDrop(e,item)} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setParentOver('');}} draggable={!busy} aria-busy={busy === item.path}
-            onDragStart={e => { if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-vault-dashboard-task',item.path); }}
+          {rows.map(item => <article key={item.path} className={`daylight-kanban-card${parentOver === item.path ? ' is-parent-target' : ''}`} onDragOver={e=>parentDragOver(e,item)} onDrop={e=>parentDrop(e,item)} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setParentOver('');}} draggable={!busy} aria-busy={busy === item.path}
+            onDragStart={e => { if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-daylight-task',item.path); }}
             onDragEnd={() => { dragged.current=null;setOver('');setParentOver(''); }}>
-            {parentOver === item.path && <span className="vd-parent-drop-hint">このタスクの子にする</span>}
-            <div className="vd-kanban-card-head"><span className={`vd-kanban-card-state${item.status === 'done' ? ' is-done' : ''}`} aria-hidden="true">{item.status === 'done' && <CompletedIcon />}</span><span className="vd-kanban-project">{item.projectLabel || 'タスク'}</span>{!['done','cancelled'].includes(item.status) && <button className={`vd-kanban-run-button${isTaskRunning(item) ? ' is-running' : ''}`} type="button" disabled={!!busy} aria-label={`${item.title}の作業を${isTaskRunning(item) ? '終了' : '開始'}`} title={isTaskRunning(item) ? '作業を終了して完了' : '作業を開始'} onClick={() => void execute(item)}>
+            {parentOver === item.path && <span className="daylight-parent-drop-hint">このタスクの子にする</span>}
+            <div className="daylight-kanban-card-head"><span className={`daylight-kanban-card-state${item.status === 'done' ? ' is-done' : ''}`} aria-hidden="true">{item.status === 'done' && <CompletedIcon />}</span><span className="daylight-kanban-project">{item.projectLabel || 'タスク'}</span>{!['done','cancelled'].includes(item.status) && <button className={`daylight-kanban-run-button${isTaskRunning(item) ? ' is-running' : ''}`} type="button" disabled={!!busy} aria-label={`${item.title}の作業を${isTaskRunning(item) ? '終了' : '開始'}`} title={isTaskRunning(item) ? '作業を終了して完了' : '作業を開始'} onClick={() => void execute(item)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{isTaskRunning(item) ? <rect x="6" y="6" width="12" height="12" rx="2"/> : <path d="M7 4.8a1 1 0 0 1 1.5-.86l12 7.2a1 1 0 0 1 0 1.72l-12 7.2A1 1 0 0 1 7 19.2Z"/>}</svg>
-            </button>}<button className="vd-kanban-menu-button" type="button" aria-label={`${item.title}の操作`} aria-expanded={menu === item.path} onClick={() => setMenu(menu === item.path ? null : item.path)}>⋯</button></div>
-            <button className="vd-kanban-title" onClick={() => onSelect(item.path)}>{item.title}</button>
-            {['on_going','done'].includes(item.status) && <span className="vd-kanban-work-times" title={`作業開始 ${item.taskStart != null ? `${dayKey(item.taskStart)} ${timeLabel(item.taskStart)}` : '未設定'} ／ 作業終了 ${item.taskEnd != null ? `${dayKey(item.taskEnd)} ${timeLabel(item.taskEnd)}` : '未設定'}`}>
+            </button>}<button className="daylight-kanban-menu-button" type="button" aria-label={`${item.title}の操作`} aria-expanded={menu === item.path} onClick={() => setMenu(menu === item.path ? null : item.path)}>⋯</button></div>
+            <button className="daylight-kanban-title" onClick={() => onSelect(item.path)}>{item.title}</button>
+            {['on_going','done'].includes(item.status) && <span className="daylight-kanban-work-times" title={`作業開始 ${item.taskStart != null ? `${dayKey(item.taskStart)} ${timeLabel(item.taskStart)}` : '未設定'} ／ 作業終了 ${item.taskEnd != null ? `${dayKey(item.taskEnd)} ${timeLabel(item.taskEnd)}` : '未設定'}`}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>
               {item.taskStart != null ? <time dateTime={localTimestamp(item.taskStart)} aria-label="作業開始">{timeLabel(item.taskStart)}</time> : <span aria-label="作業開始未設定">--:--</span>}
-              <span className="vd-work-arrow" aria-hidden="true">→</span>
+              <span className="daylight-work-arrow" aria-hidden="true">→</span>
               {item.taskEnd != null ? <time dateTime={localTimestamp(item.taskEnd)} aria-label="作業終了">{timeLabel(item.taskEnd)}</time> : <span aria-label="作業終了未設定">--:--</span>}
             </span>}
-            {item.due !== null && <span className="vd-kanban-meta">締切 {dayKey(item.due)} {timeLabel(item.due)}</span>}
-            {workDuration(item) && <span className="vd-kanban-meta vd-work-duration">作業時間 {workDuration(item)}</span>}
-            {!!children.get(item.path)?.length && <div className="vd-child-tasks">
-              <button type="button" className="vd-child-toggle" aria-expanded={!collapsed.has(item.path)} onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(item.path))next.delete(item.path);else next.add(item.path);return next;})}>サブタスク {children.get(item.path)!.filter(child=>child.status==='done').length}/{children.get(item.path)!.length}<span aria-hidden="true">{collapsed.has(item.path) ? '›' : '⌄'}</span></button>
-              {!collapsed.has(item.path) && children.get(item.path)!.map(child=><button key={child.path} type="button" className={`vd-child-row${parentOver === child.path ? ' is-parent-target' : ''}`} title={`${child.title} · ${isStatus(child.status) ? STATUS[child.status].label : child.status || '未設定'}`} onClick={()=>onSelect(child.path)} onDragOver={e=>parentDragOver(e,child)} onDrop={e=>parentDrop(e,child)}>
-                <span className={`vd-child-status${child.status === 'done' ? ' is-done' : ''}`} style={{'--vd-child-state':kanbanColor(child.status)} as CSSProperties} aria-label={isStatus(child.status) ? STATUS[child.status].label : '状態未設定'}>{child.status === 'done' && <CompletedIcon />}</span><span className="vd-child-title">{child.title}</span>
+            {item.due !== null && <span className="daylight-kanban-meta">締切 {dayKey(item.due)} {timeLabel(item.due)}</span>}
+            {workDuration(item) && <span className="daylight-kanban-meta daylight-work-duration">作業時間 {workDuration(item)}</span>}
+            {!!children.get(item.path)?.length && <div className="daylight-child-tasks">
+              <button type="button" className="daylight-child-toggle" aria-expanded={!collapsed.has(item.path)} onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(item.path))next.delete(item.path);else next.add(item.path);return next;})}>サブタスク {children.get(item.path)!.filter(child=>child.status==='done').length}/{children.get(item.path)!.length}<span aria-hidden="true">{collapsed.has(item.path) ? '›' : '⌄'}</span></button>
+              {!collapsed.has(item.path) && children.get(item.path)!.map(child=><button key={child.path} type="button" className={`daylight-child-row${parentOver === child.path ? ' is-parent-target' : ''}`} title={`${child.title} · ${isStatus(child.status) ? STATUS[child.status].label : child.status || '未設定'}`} onClick={()=>onSelect(child.path)} onDragOver={e=>parentDragOver(e,child)} onDrop={e=>parentDrop(e,child)}>
+                <span className={`daylight-child-status${child.status === 'done' ? ' is-done' : ''}`} style={{'--daylight-child-state':kanbanColor(child.status)} as CSSProperties} aria-label={isStatus(child.status) ? STATUS[child.status].label : '状態未設定'}>{child.status === 'done' && <CompletedIcon />}</span><span className="daylight-child-title">{child.title}</span>
               </button>)}
             </div>}
-            {menu === item.path && <div className="vd-kanban-status-menu" role="group" aria-label={`${item.title}の操作`}>
-              <label className="vd-parent-picker"><span>ステータス</span><select aria-label={`${item.title}のステータス`} value={item.status} disabled={!!busy} onChange={e=>{const status=e.target.value;if(isStatus(status))void move(item,status);}}>
+            {menu === item.path && <div className="daylight-kanban-status-menu" role="group" aria-label={`${item.title}の操作`}>
+              <label className="daylight-parent-picker"><span>ステータス</span><select aria-label={`${item.title}のステータス`} value={item.status} disabled={!!busy} onChange={e=>{const status=e.target.value;if(isStatus(status))void move(item,status);}}>
                 {!isStatus(item.status) && <option value={item.status}>{item.status || '未設定'}</option>}
                 {Object.entries(STATUS).map(([value,state])=><option key={value} value={value}>{state.label}</option>)}
               </select></label>
-              <label className="vd-parent-picker"><span>プロジェクト</span><select aria-label={`${item.title}のプロジェクト`} value={item.projectPath || ''} disabled={!!busy} onChange={e=>void assignProject(item,e.target.value)}>
+              <label className="daylight-parent-picker"><span>プロジェクト</span><select aria-label={`${item.title}のプロジェクト`} value={item.projectPath || ''} disabled={!!busy} onChange={e=>void assignProject(item,e.target.value)}>
                 <option value="">未設定</option>
                 {item.projectPath && !allItems.some(p=>p.kind==='project' && p.path===item.projectPath) && <option value={item.projectPath}>{item.projectLabel || item.projectPath}</option>}
                 {allItems.filter(p=>p.kind==='project' && (!p.archived || p.path===item.projectPath)).map(p=><option key={p.path} value={p.path}>{p.title}</option>)}
               </select></label>
-              <label className="vd-parent-picker"><span>親タスク</span><select aria-label={`${item.title}の親タスク`} value={item.parentTaskPath || ''} disabled={!!busy} onChange={e=>void assignParent(item,e.target.value)}>
+              <label className="daylight-parent-picker"><span>親タスク</span><select aria-label={`${item.title}の親タスク`} value={item.parentTaskPath || ''} disabled={!!busy} onChange={e=>void assignParent(item,e.target.value)}>
                 <option value="">親なし</option>
                 {item.parentTaskPath && !allItems.some(p=>p.path===item.parentTaskPath) && <option value={item.parentTaskPath}>{item.parentTaskLabel || item.parentTaskPath}</option>}
                 {allItems.filter(p=>p.kind==='task' && canParent(allItems,item.path,p.path)).map(p=><option key={p.path} value={p.path}>{p.title} · {p.targetDate || '予定日未定'}</option>)}
@@ -119,8 +119,8 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
             </div>}
 
           </article>)}
-          {!rows.length && <p className="vd-kanban-empty">タスクなし</p>}
-          {onAddTask && isStatus(status) && <div className="vd-kanban-add-zone"><button type="button" className="vd-kanban-add" aria-label={`${label}にタスクを追加`} onClick={()=>onAddTask(status)}>＋ 追加</button></div>}
+          {!rows.length && <p className="daylight-kanban-empty">タスクなし</p>}
+          {onAddTask && isStatus(status) && <div className="daylight-kanban-add-zone"><button type="button" className="daylight-kanban-add" aria-label={`${label}にタスクを追加`} onClick={()=>onAddTask(status)}>＋ 追加</button></div>}
         </section>;
       })}
     </div>
