@@ -93,3 +93,14 @@ test('parent card shows only direct children while child cards stay in their own
   assert.equal((html.match(/>進行中の子<\//g)||[]).length,2);
   assert.ok(html.includes('vd-child-row'));assert.ok(!html.includes('aria-label="保留のタスク"'));
 });
+
+test('phone board stacks status columns while iPad and desktop keep the horizontal layout',async()=>{
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const module={exports:{} as any},require=createRequire(path.join(process.cwd(),'package.json'));
+  const Platform={isPhone:true,isTablet:false};
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{},Platform}:require(id),console,Intl,Date});
+  const render=()=>renderToStaticMarkup(React.createElement(module.exports.Kanban,{items:[],store:{},onSelect:()=>{}}));
+  assert.ok(render().includes('class="vd-kanban vd-kanban-phone"'));
+  Platform.isPhone=false;Platform.isTablet=true;assert.ok(!render().includes('vd-kanban-phone'));
+  Platform.isTablet=false;assert.ok(!render().includes('vd-kanban-phone'));
+});

@@ -279,3 +279,7 @@
 
 .vd-child-status.is-done { width: 12px; height: 12px; border: 0; }
 .vd-child-status.is-done svg { display: block; width: 12px; height: 12px; }
+
+/* Stack status columns on phones; tablets retain the horizontal board. */
+.vd-kanban.vd-kanban-phone { flex-direction: column; overflow-x: visible; min-height: 0; }
+.vd-kanban-phone > .vd-kanban-column { flex: 0 0 auto; width: 100%; min-width: 0; }

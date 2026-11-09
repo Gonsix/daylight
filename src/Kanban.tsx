@@ -1,5 +1,5 @@
 import React, { CSSProperties, useMemo, useRef, useState } from 'react';
-import { Notice } from 'obsidian';
+import { Notice, Platform } from 'obsidian';
 import { childTasks, canParent } from './hierarchy';
 import { isTaskRunning, workDuration } from './execution';
 import { DashboardStore } from './store';
@@ -68,7 +68,7 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
   };
   return <div className="vd-kanban-wrap">
     <div className="vd-kanban-tools"><label className="vd-kanban-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" aria-label="カンバン内のタスクを検索" placeholder="タスク名・プロジェクトで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" aria-expanded={showOther} onClick={() => setShowOther(v => !v)}>{showOther ? '保留・中止を隠す' : '保留・中止を表示'}{otherCount > 0 ? ` (${otherCount})` : ''}</button></div>
-    <div className="vd-kanban" aria-label="タスクのカンバン" tabIndex={0}>
+    <div className={`vd-kanban${Platform?.isPhone ? ' vd-kanban-phone' : ''}`} aria-label="タスクのカンバン" tabIndex={0}>
       {columns.map(status => {
         const rows = visibleItems.filter(i => status === 'unknown' ? !isStatus(i.status) : i.status === status);
         const label = isStatus(status) ? STATUS[status].label : '状態未設定';
