@@ -11,7 +11,7 @@ import { openDeleteNoteModal } from './DeleteNoteModal';
 import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
 import { submitOnCommandEnter } from './shortcuts';
-import { carryovers, centeredScrollTop, completedTasks, dayKey, dayStart, filterTasks, hasSchedule, isActive, isStatus, Item, moveDay, STATUS, TaskTab, timeline, timeLabel } from './model';
+import { centeredScrollTop, dayKey, dayStart, hasSchedule, isActive, isStatus, Item, moveDay, STATUS, TaskTab, timeline, timeLabel } from './model';
 
 function Icon({ name, size = 16 }: { name: string; size?: number }) {
   const paths: Record<string, React.ReactNode> = {
@@ -37,24 +37,6 @@ function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
     {!isStatus(item.status) && <option value={item.status}>{item.status || '未設定'}</option>}
     {Object.entries(STATUS).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
   </select>;
-}
-function ItemRow({ item, store, onSelect, past = false, finished = false }: { item: Item; store: DaylightStore; onSelect: (path: string) => void; past?: boolean; finished?:boolean }) {
-  const pastDate = past ? item.targetDate || (item.start !== null ? dayKey(item.start) : '') : '';
-  const projectLabel = item.projectLabel.trim();
-  return <div className="daylight-item-row" style={stateColor(item)}>
-    <button className="daylight-row-main" onClick={() => onSelect(item.path)}>
-      <span className="daylight-kind"><Icon name={item.kind} /></span>
-      <span className="daylight-row-text"><span className="daylight-item-title">{item.title}</span>
-        {(pastDate || projectLabel || item.due !== null || (finished&&item.completedAt!=null)) && <span className="daylight-item-meta">
-          {pastDate && <time>{pastDate}</time>}
-          {finished&&item.completedAt!=null&&<time>完了 {timeLabel(item.completedAt)}</time>}
-          {projectLabel && <span className="daylight-project-chip" title={projectLabel} aria-label={`プロジェクト: ${projectLabel}`}><Icon name="project" size={11} /><span>{projectLabel}</span></span>}
-          {item.due !== null && <span className={item.due < Date.now() && isActive(item) ? 'daylight-overdue' : ''}>締切 {dayKey(item.due).slice(5)} {timeLabel(item.due)}</span>}
-        </span>}
-      </span>
-    </button>
-    <StatusSelect item={item} store={store} />
-  </div>;
 }
 function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string) => void; projectPath: string }) {
   const slots = useMemo(() => timeline(items, day, now), [items, day, now]);
@@ -166,7 +148,6 @@ export function Daylight({ store, initialDate = null }: { store: DaylightStore; 
   useEffect(() => { setNow(Date.now()); }, [revision]);
   const [chosenDay, setDay] = useState<string | null>(initialDate);
   const day = chosenDay ?? dayKey(now);
-  const kanban = store.kanbanEnabled;
   const [tab, setTab] = useState<TaskTab>('day'); const [project, setProject] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -178,10 +159,7 @@ export function Daylight({ store, initialDate = null }: { store: DaylightStore; 
   };
   const close = () => { setSelected(null); focusReturn.current?.focus(); };
   const scoped = useMemo(() => items.filter(i => !project || i.kind === 'project' || i.projectPath === project), [items, project]);
-  const tasks = useMemo(() => filterTasks(tab==='all'?scoped:scoped.filter(isActive), day, tab), [scoped, day, tab]);
   const boardTasks = useMemo(() => kanbanTasks(scoped,day,tab),[scoped,day,tab]);
-  const past = useMemo(() => carryovers(scoped, day), [scoped, day]);
-  const finished = useMemo(()=>completedTasks(scoped,day),[scoped,day]);
   const projects = items.filter(i => i.kind === 'project' && !i.archived && isActive(i));
   const currentProject = items.find(i => i.path === project);
   const selectedItem = items.find(i => i.path === selected);
@@ -199,23 +177,15 @@ export function Daylight({ store, initialDate = null }: { store: DaylightStore; 
       <Timeline items={scoped} day={day} now={now} store={store} onSelect={select} projectPath={project ?? ''} />
       <div className="daylight-side">
         <section className="daylight-panel daylight-tasks">
-          <div className="daylight-section-head"><h2>タスク</h2><span className="daylight-count">{kanban ? boardTasks.length : tasks.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="タスクを追加" title="タスクを追加" onClick={() => openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '')}>＋</button></div>
+          <div className="daylight-section-head"><h2>タスク</h2><span className="daylight-count">{boardTasks.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="タスクを追加" title="タスクを追加" onClick={() => openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '')}>＋</button></div>
           <div className="daylight-tabs" role="tablist" aria-label="タスクの表示範囲">
             {([['day', '選択日'], ['ongoing', '進行中'], ['unscheduled', '予定日未定'], ['all', 'すべて']] as const).map(([id, label]) =>
               <button role="tab" aria-selected={tab === id} className={tab === id ? 'is-active' : ''} key={id} onClick={() => setTab(id)}>{id === 'day' && day === dayKey(now) ? '今日' : label}</button>)}
           </div>
-          <>{kanban ? <Kanban items={boardTasks} allItems={items} store={store} onSelect={select} onAddTask={status=>openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '',status)} /> : <>
-          <div className="daylight-task-list">{tasks.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} />)}{!tasks.length && <p className="daylight-empty">タスクなし</p>}</div>
-          {tab === 'day' && past.length > 0 && <div className="daylight-carryover"><div className="daylight-subhead"><h3>持ち越し</h3><span>{past.length}</span></div>
-            {past.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} past />)}
-          </div>}
-          {tab==='day'&&finished.length>0&&<div className="daylight-finished"><div className="daylight-subhead"><h3>完了したタスク</h3><span>{finished.length}</span></div>
-            {finished.map(i=><ItemRow key={i.path} item={i} store={store} onSelect={select} finished/>)}
-          </div>}
-          </>}</>
+          <Kanban items={boardTasks} allItems={items} store={store} onSelect={select} onAddTask={status=>openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '',status)} />
         </section>
         {invalid.length > 0 && <section className="daylight-panel daylight-unscheduled"><div className="daylight-section-head"><h2>日時の確認</h2><span className="daylight-count">{invalid.length}</span></div>
-          {invalid.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} />)}</section>}
+          {invalid.map(i => <button key={i.path} className="daylight-schedule-warning" onClick={() => select(i.path)}><Icon name={i.kind} /><span>{i.title}</span></button>)}</section>}
         <section className="daylight-panel daylight-projects"><div className="daylight-section-head"><h2>プロジェクト</h2><span className="daylight-count">{projects.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="プロジェクトを追加" title="プロジェクトを追加" onClick={() => openProjectModal(store)}>＋</button></div>
           <div className="daylight-project-grid">{projects.map(p => {
             const count = items.filter(i => i.kind === 'task' && i.projectPath === p.path && isActive(i)).length;

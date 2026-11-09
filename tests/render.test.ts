@@ -8,7 +8,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { dateTime, Item } from '../src/model';
 
-test('React renders timeline, inline state menus, project and carryover without network or Obsidian runtime', async () => {
+test('React renders timeline, inline state menus, project and carried-over kanban cards without network or Obsidian runtime', async () => {
   const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['obsidian','react','react/*','react-dom/*']});
   const module={exports:{} as any};const require=createRequire(path.join(process.cwd(),'package.json'));
   vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});
@@ -18,7 +18,7 @@ test('React renders timeline, inline state menus, project and carryover without 
     {...base,path:'notes/Cancelled.md',kind:'event',title:'中止した予定',status:'cancelled'}, {...base,path:'notes/Hold.md',kind:'event',title:'保留した予定',status:'on_hold'}];
   const store={subscribe:()=>()=>{},snapshot:()=>1,items:()=>rows};
   const html=renderToStaticMarkup(React.createElement(module.exports.Daylight,{store,initialDate:'2026-11-06'}));
-  for(const text of ['タイムライン','研究ミーティング','実装タスク','持ち越し','前日のタスク','プロジェクト','進行中','保留']) assert.ok(html.includes(text),text);
+  for(const text of ['タイムライン','研究ミーティング','実装タスク','前日のタスク','プロジェクト','進行中','保留']) assert.ok(html.includes(text),text);
   assert.ok(html.includes('aria-label="タスクを追加"'));
   assert.ok(html.includes('aria-label="プロジェクトを追加"'));
   assert.ok(html.includes('daylight-slot-task'));assert.ok(html.includes('daylight-slot-event'));
@@ -27,8 +27,8 @@ test('React renders timeline, inline state menus, project and carryover without 
   assert.ok(!html.includes('type="date"'));
   assert.ok(!html.includes('iframe'));assert.ok(!html.includes('<script'));
   assert.ok(html.includes('中止した予定'));assert.ok(html.includes('保留した予定'));
-  assert.ok(html.includes('完了したタスク'));assert.ok(html.includes('本日完了したタスク'));
-  assert.ok(html.indexOf('>持ち越し</h3>')<html.indexOf('>完了したタスク</h3>'));
+  assert.ok(html.includes('本日完了したタスク'));assert.ok(html.includes('aria-label="タスクのカンバン"'));
+  assert.ok(!html.includes('daylight-task-list'));assert.ok(!html.includes('daylight-carryover'));
 });
 
 
@@ -45,19 +45,18 @@ test('task and project composers render the appropriate fields with Command+Ente
   assert.ok(!project.includes('datetime-local'));
 });
 
-test('kanban is controlled only by settings, hides hold/cancelled columns, and preserves task scope', async () => {
+test('kanban always renders, hides hold/cancelled columns, and preserves task scope', async () => {
   const result=await build({entryPoints:[path.resolve('src/Daylight.tsx'),path.resolve('src/Kanban.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
   const require=createRequire(path.join(process.cwd(),'package.json'));
   const modules=result.outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});return module.exports;});
   const base:Item={path:'notes/A.md',title:'作業A',kind:'task',status:'todo',targetDate:'2026-11-08',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
   const rows=[base,{...base,path:'notes/B.md',status:'on_going'}, {...base,path:'notes/C.md',status:'done',completedAt:dateTime('2026-11-08T10:00:00')}, {...base,path:'notes/H.md',status:'on_hold'}, {...base,path:'notes/X.md',status:'cancelled'}, {...base,path:'notes/Old.md',targetDate:'2026-11-07'}, {...base,path:'notes/Event.md',kind:'event'}] as Item[];
-  const store={subscribe:()=>()=>{},snapshot:()=>1,items:()=>rows,kanbanEnabled:true};
+  const store={subscribe:()=>()=>{},snapshot:()=>1,items:()=>rows};
   const html=renderToStaticMarkup(React.createElement(modules[0].Daylight,{store,initialDate:'2026-11-08'}));
   for(const label of ['未着手のタスク','進行中のタスク','完了のタスク','保留・中止を表示']) assert.ok(html.includes(label),label);
   assert.ok(!html.includes('aria-label="保留のタスク"')); assert.ok(!html.includes('aria-label="中止のタスク"'));
   assert.ok(!html.includes('daylight-view-switch')); assert.ok(!html.includes('タスクの表示形式'));
-  const list=renderToStaticMarkup(React.createElement(modules[0].Daylight,{store:{...store,kanbanEnabled:false},initialDate:'2026-11-08'}));
-  assert.ok(!list.includes('aria-label="タスクのカンバン"')); assert.ok(list.includes('daylight-task-list'));
+  assert.ok(!html.includes('daylight-task-list'));
   const day=modules[1].kanbanTasks(rows,'2026-11-08','day');
   assert.equal(day.length,6); assert.equal(new Set(day.map((i:Item)=>i.path)).size,6); assert.ok(!day.some((i:Item)=>i.kind==='event'));
   assert.equal(modules[1].kanbanTasks(rows,'2026-11-08','ongoing').length,1);

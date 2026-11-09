@@ -69,30 +69,10 @@
 .daylight-tabs { display: flex; gap: 16px; padding: 0 17px; border-bottom: 1px solid var(--daylight-border); overflow: auto; }
 .daylight-app .daylight-tabs button { padding: 4px 0 10px; background: none; color: var(--daylight-muted); border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: 11px; white-space: nowrap; }
 .daylight-app .daylight-tabs button.is-active { color: var(--daylight-text); border-bottom-color: var(--daylight-accent); }
-.daylight-task-list { max-height: 360px; overflow: auto; }
-.daylight-item-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid color-mix(in srgb, var(--daylight-border) 50%, transparent); }
-.daylight-item-row:last-child { border-bottom: 0; }
-.daylight-app .daylight-row-main { display: flex; align-items: flex-start; justify-content: flex-start; flex: 1; min-width: 0; gap: 10px; padding: 0; text-align: left; border: 0; background: transparent; color: var(--daylight-text); }
-.daylight-kind { color: var(--daylight-muted); display: flex; flex: 0 0 auto; padding-top: 2px; }
-.daylight-row-text { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; text-align: left; }
-.daylight-item-title { font-size: 12px; overflow-wrap: anywhere; }
-.daylight-item-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 5px 8px; width: 100%; color: var(--daylight-muted); font-size: 10px; text-align: left; }
-.daylight-item-meta:empty { display: none; }
-.daylight-project-chip { display: inline-flex; align-items: center; gap: 5px; max-width: min(100%, 180px); padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--daylight-border) 75%, transparent); border-radius: 4px; background: var(--daylight-raised); color: var(--daylight-muted); font-size: 10px; font-weight: 400; line-height: 1.6; }
-.daylight-project-chip svg { flex: 0 0 auto; opacity: .8; }
-.daylight-project-chip > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.daylight-overdue { color: #e5a888; }
 .daylight-app select.daylight-status { height: 25px; width: 94px; flex: 0 0 auto; padding: 2px 20px 2px 9px; color: var(--daylight-state, var(--daylight-muted)); border: 1px solid color-mix(in srgb, var(--daylight-state, var(--daylight-muted)) 25%, transparent); border-radius: 5px; background-color: color-mix(in srgb, var(--daylight-state, var(--daylight-muted)) 7%, var(--daylight-surface)); box-shadow: none; font-size: 10px; cursor: pointer; }
 .theme-light .daylight-app select.daylight-status { color: color-mix(in srgb, var(--daylight-state, var(--daylight-muted)) 60%, #15263b); }
 .daylight-app select.daylight-status option { background: var(--daylight-surface); color: var(--daylight-text); }
 .daylight-empty { padding: 25px 17px; color: var(--daylight-muted); font-size: 12px; }
-.daylight-carryover { border-top: 1px solid var(--daylight-border); max-height: 300px; overflow: auto; }
-.daylight-subhead { display: flex; align-items: center; gap: 8px; padding: 13px 17px 4px; color: #d1ae73; }
-.daylight-subhead h3, .daylight-subhead span { font-size: 11px; font-weight: 500; }
-.daylight-carryover .daylight-item-meta { color: #b69c77; }
-.daylight-finished { border-top: 1px solid var(--daylight-border); max-height: 300px; overflow: auto; }
-.daylight-finished .daylight-subhead { color: #34d399; }
-.daylight-finished .daylight-item-title { color: var(--daylight-muted); }
 .daylight-unscheduled .daylight-section-head { color: #d1ae73; }
 .daylight-project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; padding: 0 14px 14px; }
 .daylight-project { min-width: 0; border: 1px solid var(--daylight-border); border-radius: 7px; padding: 12px; }
@@ -198,7 +178,6 @@
   .daylight-header { gap: 12px; }
 }
 @container (max-width: 380px) {
-  .daylight-item-row { padding-inline: 10px; gap: 6px; }
   .daylight-app select.daylight-status { width: 82px; }
   .daylight-tabs { gap: 10px; }
 }
@@ -290,3 +269,6 @@
 .daylight-app .daylight-kanban-add:hover { background: rgb(128 128 128 / 14%); color: var(--daylight-text); }
 @media (hover: none), (pointer: coarse) { .daylight-app .daylight-kanban-add { opacity: 1; pointer-events: auto; } }
 .daylight-kanban-phone .daylight-kanban-add { opacity: 1; pointer-events: auto; }
+
+.daylight-app .daylight-schedule-warning { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; padding: 10px 16px; border: 0; background: transparent; color: var(--daylight-muted); text-align: left; font-size: 12px; }
+.daylight-schedule-warning svg { flex-shrink: 0; }

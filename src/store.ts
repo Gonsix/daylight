@@ -9,7 +9,6 @@ import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote }
 export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; content: string }
 
 export class DaylightStore {
-  kanbanEnabled = false;
   readonly storage: DaylightStorage;
   private storageChanging = false;
   private listeners = new Set<() => void>();

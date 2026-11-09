@@ -88,25 +88,18 @@ test('startup preference is persisted', async () => {
   assert.equal(registrations.saved.openOnStartup, true);
 });
 
-test('kanban preference defaults off, persists, and updates existing store subscribers', async () => {
-  const { plugin } = await loadPlugin();
-  assert.equal(plugin.settings.enableKanban,false);
-  assert.equal(plugin.store.kanbanEnabled,false);
-  let changes=0; plugin.store.subscribe(()=>{changes++;});
-  plugin.settings.enableKanban=true;
-  await plugin.saveSettings();
-  assert.equal(plugin.store.kanbanEnabled,true); assert.equal(changes,1);
-  plugin.settings.enableKanban=false; await plugin.saveSettings();
-  assert.equal(plugin.store.kanbanEnabled,false); assert.equal(changes,2);
-  const loaded=await loadPlugin({enableKanban:true});
-  assert.equal(loaded.plugin.store.kanbanEnabled,true);
-  const invalid=await loadPlugin({enableKanban:'true'});
-  assert.equal(invalid.plugin.store.kanbanEnabled,false);
+test('obsolete kanban preference is discarded while startup and storage settings are preserved',async()=>{
+  for(const enableKanban of [true,false,'true']) {
+    const {plugin,registrations}=await loadPlugin({enableKanban,openOnStartup:true,rootFolder:'etc/Daylight'});
+    assert.equal(Object.hasOwn(plugin.settings,'enableKanban'),false);
+    assert.equal(Object.hasOwn(plugin.store,'kanbanEnabled'),false);
+    assert.equal(Object.hasOwn(registrations.saved,'enableKanban'),false);
+    assert.equal(plugin.settings.openOnStartup,true);assert.equal(plugin.settings.rootFolder,'etc/Daylight');
+  }
 });
 
-
 test('saved root configuration is normalized and initialized on installation',async()=>{
-  const {plugin,storageFiles,registrations}=await loadPlugin({rootFolder:'/etc/Daylight/',enableKanban:true});
+  const {plugin,storageFiles,registrations}=await loadPlugin({rootFolder:'/etc/Daylight/'});
   assert.equal(plugin.settings.rootFolder,'etc/Daylight');assert.equal(plugin.store.storage.root,'etc/Daylight');
   for(const name of ['Tasks','Events','Projects','Templates'])assert.ok(storageFiles.has(`etc/Daylight/${name}`));
   for(const name of ['Task','Event','Project'])assert.ok(storageFiles.has(`etc/Daylight/Templates/${name}.md`));

@@ -8,8 +8,8 @@ import { DAYLIGHT_ICON, DAYLIGHT_ICON_SVG } from './icon';
 import { DEFAULT_ROOT, storageRoot } from './storage';
 
 const VIEW_TYPE = 'daylight';
-interface DaylightSettings { openOnStartup: boolean; enableKanban: boolean; rootFolder: string }
-const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, enableKanban: false, rootFolder: DEFAULT_ROOT };
+interface DaylightSettings { openOnStartup: boolean; rootFolder: string }
+const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, rootFolder: DEFAULT_ROOT };
 
 class DaylightSettingTab extends PluginSettingTab {
   constructor(private dashboard: DaylightPlugin) { super(dashboard.app, dashboard); }
@@ -27,7 +27,6 @@ class DaylightSettingTab extends PluginSettingTab {
       }));
     for (const [key, name, desc] of [
       ['openOnStartup', '起動時にDaylightを開く', 'Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。'],
-      ['enableKanban', 'カンバンビューを有効にする', 'タスクをカンバン形式で表示します。オフにするとリスト表示に戻ります。保留・中止の列は必要なときに開けます。'],
     ] as const) {
       new Setting(this.containerEl).setName(name).setDesc(desc)
         .addToggle(toggle => toggle.setValue(this.dashboard.settings[key]).onChange(async value => {
@@ -76,11 +75,11 @@ export default class DaylightPlugin extends Plugin {
   async onload() {
     addIcon(DAYLIGHT_ICON, DAYLIGHT_ICON_SVG);
     const saved = await this.loadData();
-    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, enableKanban: typeof saved?.enableKanban === 'boolean' ? saved.enableKanban : DEFAULT_SETTINGS.enableKanban, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT };
+    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT };
+    if (saved && Object.hasOwn(saved,'enableKanban')) await this.saveData(this.settings);
     this.addSettingTab(new DaylightSettingTab(this));
     this.store = new DaylightStore(this.app, this, this.settings.rootFolder);
     await this.store.storage.ensure();
-    this.store.kanbanEnabled = this.settings.enableKanban;
     this.registerView(VIEW_TYPE, leaf => new DaylightView(leaf, this.store));
     const open = async () => {
       const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -121,7 +120,6 @@ export default class DaylightPlugin extends Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    this.store.kanbanEnabled = this.settings.enableKanban;
     this.store.invalidate();
   }
   async changeRootFolder(value: string) {
