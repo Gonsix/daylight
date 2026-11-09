@@ -287,6 +287,6 @@
 .vd-kanban-add-zone { display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 6px; }
 .vd-app .vd-kanban-add { width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--vd-muted); opacity: 0; pointer-events: none; }
 .vd-kanban-add-zone:hover .vd-kanban-add, .vd-kanban-add-zone:focus-within .vd-kanban-add { opacity: 1; pointer-events: auto; }
-.vd-app .vd-kanban-add:hover { background: var(--vd-raised); color: var(--vd-text); }
+.vd-app .vd-kanban-add:hover { background: rgb(128 128 128 / 14%); color: var(--vd-text); }
 @media (hover: none), (pointer: coarse) { .vd-app .vd-kanban-add { opacity: 1; pointer-events: auto; } }
 .vd-kanban-phone .vd-kanban-add { opacity: 1; pointer-events: auto; }
