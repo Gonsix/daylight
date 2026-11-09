@@ -7,7 +7,7 @@ import { submitOnCommandEnter } from './shortcuts';
 
 export function TaskProperties({ item, store, revision, onSaved, actions }: { item:Item; store:DashboardStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode }) {
   const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(null),[changes,setChanges]=useState<PropertyChanges>({});
-  const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[reset,setReset]=useState(0);
+  const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[newType,setNewType]=useState('text');
   const dirty=useRef(false),saving=useRef(false),mounted=useRef(true);
   useEffect(()=>()=>{mounted.current=false;},[]);
@@ -17,10 +17,9 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     let cancelled=false;
     store.loadTask(item.path).then(data=>{if(!cancelled&&!dirty.current)install(data);}).catch(e=>{if(!cancelled)setError(e.message);});
     return ()=>{cancelled=true;};
-  },[item.path,revision,reset]);
-  const reload=()=>{dirty.current=false;setReset(x=>x+1);};
+  },[item.path,revision]);
   const change=(key:string,value:unknown)=>{dirty.current=true;setChanges(prev=>({...prev,[key]:value}));setError('');};
-  if(!snapshot)return <div className="vd-task-properties"><p className={error?'vd-error':'vd-property-loading'}>{error||'読み込み中…'}</p>{error&&<button onClick={reload}>再読み込み</button>}</div>;
+  if(!snapshot)return <div className="vd-task-properties"><p className={error?'vd-error':'vd-property-loading'}>{error||'読み込み中…'}</p></div>;
   const keys=Array.from(new Set([...TASK_FIELDS,...Object.keys(snapshot.properties),...Object.keys(changes)]));
   const value=(key:string)=>Object.hasOwn(changes,key)?changes[key]:snapshot.properties[key]??null;
   const type=(key:string)=>propertyType(key,snapshot.properties[key],types[key]||snapshot.types[key]);
@@ -65,10 +64,10 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
       const file=await store.updateTask(snapshot,patch);saved=true;
       const refreshed=await store.loadTask(file.path);
       if(mounted.current)install(refreshed);onSaved(file.path);
-    } catch(e){if(mounted.current)setError(saved?'保存済みです。再読み込みしてください。':(e as Error).message);}
+    } catch(e){if(mounted.current)setError(saved?'保存済みです。詳細を開き直してください。':(e as Error).message.replaceAll('再読み込みしてください。','詳細を開き直してください。'));}
     finally {saving.current=false;if(mounted.current)setBusy(false);}
   }}>
-    <div className="vd-property-header"><h3>プロパティ</h3><button type="button" disabled={busy} onClick={reload} title="プロパティを再読み込み">再読み込み</button></div>
+    <div className="vd-property-header"><h3>プロパティ</h3></div>
     <fieldset disabled={busy} className="vd-event-fields">
       {TASK_FIELDS.map(field)}
       <div className="vd-extra-properties">{keys.filter(k=>!TASK_FIELDS.includes(k)).map(field)}</div>
