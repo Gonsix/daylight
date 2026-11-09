@@ -78,3 +78,18 @@ test('kanban exposes play/stop and only completed work has an HH:mm duration',as
   assert.ok(html.includes('aria-label="作業終了未設定">--:--</span>'));
   assert.equal((html.match(/作業時間/g)||[]).length,1);assert.ok(html.includes('作業時間 01:25'));assert.ok(!html.includes('経過時間'));
 });
+
+test('parent card shows only direct children while child cards stay in their own status columns',async()=>{
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const module={exports:{} as any},require=createRequire(path.join(process.cwd(),'package.json'));
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{}}:require(id),console,Intl,Date});
+  const base:Item={path:'notes/P.md',title:'親タスク',kind:'task',status:'todo',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
+  const child={...base,path:'notes/C.md',title:'進行中の子',status:'on_going',parentTaskPath:base.path};
+  const hidden={...base,path:'notes/H.md',title:'範囲外の子',status:'on_hold',parentTaskPath:base.path};
+  const grandchild={...base,path:'notes/G.md',title:'孫タスク',parentTaskPath:child.path};
+  const html=renderToStaticMarkup(React.createElement(module.exports.Kanban,{items:[base,child],allItems:[base,child,hidden,grandchild],store:{},onSelect:()=>{}}));
+  assert.ok(html.includes('子タスク 2'));assert.ok(html.includes('子タスク 1'));assert.ok(html.includes('範囲外の子'));assert.ok(html.includes('aria-label="保留"'));
+  assert.equal((html.match(/class="vd-kanban-card"/g)||[]).length,2);
+  assert.equal((html.match(/>進行中の子<\//g)||[]).length,2);
+  assert.ok(html.includes('vd-child-row'));assert.ok(!html.includes('aria-label="保留のタスク"'));
+});

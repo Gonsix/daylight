@@ -265,3 +265,14 @@
 .vd-kanban-work-times { display: flex; align-items: center; gap: 7px; color: var(--vd-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .vd-kanban-work-times svg { flex-shrink: 0; }
 .vd-work-arrow { margin-inline: 3px; opacity: .7; }
+
+.vd-kanban-card.is-parent-target, .vd-app .vd-child-row.is-parent-target { outline: 2px solid #a371f7; outline-offset: -1px; }
+.vd-parent-drop-hint { font-size: 10px; color: #a371f7; }
+.vd-child-tasks { padding-top: 6px; border-top: 1px solid var(--vd-border); }
+.vd-app .vd-child-toggle { display: flex; align-items: center; width: 100%; padding: 3px 0 7px; color: var(--vd-muted); background: transparent; border: 0; text-align: left; font-size: 11px; }
+.vd-child-toggle > span { margin-left: auto; }
+.vd-app .vd-child-row { display: flex; align-items: center; gap: 7px; width: 100%; padding: 5px 0 5px 10px; background: transparent; border: 0; color: var(--vd-muted); text-align: left; }
+.vd-child-status { flex-shrink: 0; display: grid; place-items: center; width: 12px; height: 12px; border: 1.5px solid var(--vd-child-state); border-radius: 50%; color: var(--vd-child-state); font-size: 8px; line-height: 1; }
+.vd-child-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
+.vd-parent-picker { display: flex; flex-direction: column; gap: 5px; color: var(--vd-muted); font-size: 11px; }
+.vd-parent-picker select { width: 100%; min-width: 0; }

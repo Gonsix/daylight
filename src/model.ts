@@ -11,6 +11,7 @@ export interface Item {
   path: string; title: string; kind: Kind; status: string; targetDate: string;
   start: number | null; end: number | null; due: number | null;
   projectPath: string | null; projectLabel: string; archived: boolean;
+  parentTaskPath?: string | null; parentTaskLabel?: string;
   completedAt?: number | null;
   taskStart?: number | null; taskEnd?: number | null;
 }

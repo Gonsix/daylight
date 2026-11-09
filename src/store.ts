@@ -46,11 +46,15 @@ export class DashboardStore {
       const project = typeof fm.project === 'string' ? fm.project : '';
       const target = project.match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]$/);
       const linked = target ? this.app.metadataCache.getFirstLinkpathDest(target[1], file.path) : null;
+      const parent = typeof fm.parent_task === 'string' ? fm.parent_task : '';
+      const parentLink = parent.match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]$/);
+      const parentFile = parentLink ? this.app.metadataCache.getFirstLinkpathDest(parentLink[1],file.path) : null;
       return [{ path: file.path, title: titleFor(file.basename, kind), kind,
         status: this.overrides.get(file.path)?.status ?? raw, targetDate: dateValue(fm.target_date),
         start: dateTime(fm.schedule_start), end: dateTime(fm.schedule_end), due: dateTime(fm.due),
         projectPath: linked?.path ?? null,
         projectLabel: target?.[2] || linked?.basename || target?.[1] || project,
+        parentTaskPath: parentFile?.path ?? null, parentTaskLabel: parentLink?.[2] || (parentFile ? titleFor(parentFile.basename,'task') : parentLink?.[1]) || parent,
         archived: fm.archived === true,
         completedAt:dateTime(fm['completed at']), taskStart:dateTime(fm.task_start), taskEnd:dateTime(fm.task_end),
       }];
@@ -179,6 +183,25 @@ export class DashboardStore {
     }
     return `[[${this.file(target.path).path.replace(/\.md$/,'')}]]`;
   }
+  private async validateParentChain(parentLink: unknown, source: string) {
+    const seen=new Set([source]);
+    let raw=typeof parentLink === 'string' ? parentLink : '';
+    let context=source;
+    while (raw) {
+      const match=raw.match(/^\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]$/);
+      const file=match ? this.app.metadataCache.getFirstLinkpathDest(match[1],context) : null;
+      if (!file) throw new Error('親タスクのリンク先を確認してください。');
+      if (seen.has(file.path)) throw new Error('親タスクの関係が循環しています。');
+      seen.add(file.path);
+      const {fm}=taskDocument(await this.app.vault.read(this.file(file.path)),{parse:parseYaml,stringify:stringifyYaml});
+      raw=typeof fm.parent_task === 'string' ? fm.parent_task : '';context=file.path;
+    }
+  }
+  async setParentTask(item: Item, parentPath: string) {
+    if (item.kind !== 'task') throw new Error('タスクを選択してください。');
+    const snapshot=await this.loadTask(item.path);
+    await this.updateTask(snapshot,{parent_task:parentPath ? `[[${parentPath.replace(/\.md$/,'')}]]` : null});
+  }
   async updateTask(snapshot:TaskSnapshot,changes:PropertyChanges):Promise<TFile> {
     let result:TFile|undefined;
     await this.queue('__event_mutations__',()=>this.queue(snapshot.path,async()=>{
@@ -188,6 +211,7 @@ export class DashboardStore {
       for(const [key,kind] of [['project','project'],['parent_task','task']] as const) {
         if(Object.hasOwn(patch,key)&&!equal(patch[key],snapshot.properties[key]))patch[key]=this.taskReference(patch[key],kind,snapshot.path);
       }
+      if (Object.hasOwn(patch,'parent_task') && !equal(patch.parent_task,snapshot.properties.parent_task)) await this.validateParentChain(patch.parent_task,snapshot.path);
       const before=await this.app.vault.read(file),preview=mergeTaskProperties(before,snapshot,patch,yaml);
       const rename=preview.changed.includes('target_date')&&dateValue(preview.properties.target_date)!==dateValue(taskDocument(before,yaml).fm.target_date);
       const destination=rename?this.uniqueEventPath(`${titleFor(file.basename,'task')} ${dateValue(preview.properties.target_date)||'TBD'}`,file.path):file.path;

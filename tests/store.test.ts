@@ -367,3 +367,24 @@ test('dragging todo to ongoing and done records actual timestamps through the co
   await store.setStatus(row(),'done');assert.equal(fm.get(task.path).task_start,null);assert.ok(fm.get(task.path).task_end);
   assert.equal(fm.get(task.path).schedule_start,'2026-11-06T09:00:00');
 });
+
+test('setting a parent preserves child state, work timestamps, schedule and body, and resolves hierarchy',async()=>{
+  const {store,task,app,fm,bodies}=await fixture();
+  const parent=await app.vault.create('notes/Parent TBD.md',`---\n${JSON.stringify({tags:['task'],status:'on_hold'})}\n---\n\n## Notes\n`);store.invalidate();
+  await store.startTask(store.items().find((i:any)=>i.path===task.path));
+  const before={...fm.get(task.path)},body=bodies.get(task.path)!.split('\n---\n')[1];
+  await store.setParentTask(store.items().find((i:any)=>i.path===task.path),parent.path);
+  const current=fm.get(task.path);
+  assert.equal(current.parent_task,'[[notes/Parent TBD]]');
+  for(const key of ['status','task_start','task_end','schedule_start','schedule_end','project'])assert.equal(current[key],before[key],key);
+  assert.equal(bodies.get(task.path)!.split('\n---\n')[1],body);
+  assert.equal(store.items().find((i:any)=>i.path===task.path).parentTaskPath,parent.path);
+  await assert.rejects(()=>store.setParentTask(store.items().find((i:any)=>i.path===parent.path),task.path),/循環/);
+  await store.setParentTask(store.items().find((i:any)=>i.path===task.path),'');assert.equal(fm.get(task.path).parent_task,null);
+});
+test('parent validation checks file content even if metadata cache has not caught up',async()=>{
+  const {store,task,app,bodies}=await fixture();
+  const parent=await app.vault.create('notes/Parent TBD.md',`---\n${JSON.stringify({tags:['task'],status:'todo'})}\n---\n\n## Notes\n`);store.invalidate();
+  bodies.set(parent.path,`---\n${JSON.stringify({tags:['task'],status:'todo',parent_task:`[[${task.path.replace(/\.md$/,'')}]]`})}\n---\n\n## Notes\n`);
+  await assert.rejects(()=>store.setParentTask(store.items().find((i:any)=>i.path===task.path),parent.path),/循環/);
+});
