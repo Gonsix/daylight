@@ -13,7 +13,13 @@ export function recordWorkStatus(fm: Record<string,unknown>, previous: unknown, 
   if (fm.status === 'todo') {
     fm.task_start = null; fm.task_end = null;
   } else if (fm.status === 'on_going') {
+    if (dateTime(fm.task_start) === null) fm.task_start = localTimestamp(now);
+    if (dateTime(fm.task_start)! > now) throw new Error('作業開始が現在より後になっています。');
     fm.task_end = null;
+  } else if (fm.status === 'done' && previous !== 'done') {
+    const start = dateTime(fm.task_start);
+    if (start !== null && now < start) throw new Error('作業終了が開始時刻より前になっています。');
+    fm.task_end = localTimestamp(now);
   } else if (dateTime(fm.task_start) !== null && !fm.task_end) {
     const start = dateTime(fm.task_start)!;
     if (now < start) throw new Error('作業終了が開始時刻より前になっています。');

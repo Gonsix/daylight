@@ -32,7 +32,7 @@ test('hold/cancel/done stop an open work block while only done records completio
     assert.equal(fm.task_end,'2026-11-09T10:00:00');assert.equal(!!fm['completed at'],status==='done');
   }
   const old={status:'done',task_start:'2026-11-09T09:00:00',task_end:'2026-11-09T09:30:00'};
-  recordWorkStatus(old,'on_hold',now);assert.equal(old.task_end,'2026-11-09T09:30:00');
+  recordWorkStatus(old,'on_hold',now);assert.equal(old.task_end,'2026-11-09T10:00:00');
 });
 
 test('todo clears work bounds and ongoing reopens the saved interval',()=>{
@@ -42,4 +42,14 @@ test('todo clears work bounds and ongoing reopens the saved interval',()=>{
   const resumed={status:'on_going',task_start:start,task_end:end,'completed at':end};
   recordWorkStatus(resumed,'done');assert.equal(resumed.task_start,start);assert.equal(resumed.task_end,null);assert.equal(resumed['completed at'],null);
   assert.equal(isTaskRunning(item({taskStart:dateTime(resumed.task_start),taskEnd:null})),true);
+});
+
+
+test('drag transitions stamp missing start and current finish without inventing an unknown start',()=>{
+  const now=dateTime('2026-11-09T10:25:00')!;
+  const first:Record<string,unknown>={status:'on_going',task_start:null,task_end:null};
+  recordWorkStatus(first,'todo',now);assert.equal(first.task_start,'2026-11-09T10:25:00');assert.equal(first.task_end,null);
+  first.status='done';recordWorkStatus(first,'on_going',now+60000);assert.equal(first.task_end,'2026-11-09T10:26:00');assert.equal(first['completed at'],first.task_end);
+  const direct:Record<string,unknown>={status:'done'};
+  recordWorkStatus(direct,'todo',now);assert.equal(direct.task_end,'2026-11-09T10:25:00');assert.equal(direct.task_start,undefined);
 });

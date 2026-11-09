@@ -1,6 +1,6 @@
 import { App, Plugin, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { EventInput, EventSnapshot, KEEP_PROJECT, eventDocument, renderEvent, updateEventDocument, validateEvent } from './event';
-import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesText, localTimestamp, timeLabel, titleFor } from './model';
+import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesText, timeLabel, titleFor } from './model';
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
 import { recordWorkStatus } from './execution';
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
@@ -90,10 +90,8 @@ export class DashboardStore {
         if (fm.status !== item.status || dateTime(fm.task_start) !== (item.taskStart ?? null) || dateTime(fm.task_end) !== (item.taskEnd ?? null)) throw new Error('タスクが更新されています。開き直してください。');
         if (fm.status === 'on_going' && dateTime(fm.task_start) !== null && !fm.task_end) throw new Error('すでに開始しています。');
         const now=Date.now();
-        // A task uses one start/end pair. Resuming retains its original start.
-        if (dateTime(fm.task_start) === null) fm.task_start=localTimestamp(now);
-        if (dateTime(fm.task_start)! > now) throw new Error('作業開始が現在より後になっています。');
-        fm.task_end=null;fm.status='on_going';fm['completed at']=null;
+        const previous=fm.status;
+        fm.status='on_going';recordWorkStatus(fm,previous,now);fm['completed at']=null;
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
       });
       this.invalidate();

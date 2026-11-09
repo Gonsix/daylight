@@ -354,3 +354,16 @@ test('returning to ongoing clears only actual end; returning to todo resets both
     }
   }
 });
+
+test('dragging todo to ongoing and done records actual timestamps through the common status path',async()=>{
+  const {store,task,fm}=await fixture();const row=()=>store.items().find((i:any)=>i.path===task.path);
+  await store.setStatus(row(),'on_going');
+  const first={...fm.get(task.path)};
+  assert.match(first.task_start,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);assert.equal(first.task_end,null);
+  await store.setStatus(row(),'done');
+  const done={...fm.get(task.path)};
+  assert.equal(done.task_start,first.task_start);assert.match(done.task_end,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);assert.equal(done['completed at'],done.task_end);
+  await store.setStatus(row(),'todo');assert.equal(fm.get(task.path).task_start,null);assert.equal(fm.get(task.path).task_end,null);
+  await store.setStatus(row(),'done');assert.equal(fm.get(task.path).task_start,null);assert.ok(fm.get(task.path).task_end);
+  assert.equal(fm.get(task.path).schedule_start,'2026-11-06T09:00:00');
+});
