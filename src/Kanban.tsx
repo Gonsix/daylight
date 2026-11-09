@@ -102,6 +102,10 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
               </button>)}
             </div>}
             {menu === item.path && <div className="vd-kanban-status-menu" role="group" aria-label={`${item.title}の操作`}>
+              <label className="vd-parent-picker"><span>ステータス</span><select aria-label={`${item.title}のステータス`} value={item.status} disabled={!!busy} onChange={e=>{const status=e.target.value;if(isStatus(status))void move(item,status);}}>
+                {!isStatus(item.status) && <option value={item.status}>{item.status || '未設定'}</option>}
+                {Object.entries(STATUS).map(([value,state])=><option key={value} value={value}>{state.label}</option>)}
+              </select></label>
               <label className="vd-parent-picker"><span>プロジェクト</span><select aria-label={`${item.title}のプロジェクト`} value={item.projectPath || ''} disabled={!!busy} onChange={e=>void assignProject(item,e.target.value)}>
                 <option value="">未設定</option>
                 {item.projectPath && !allItems.some(p=>p.kind==='project' && p.path===item.projectPath) && <option value={item.projectPath}>{item.projectLabel || item.projectPath}</option>}
@@ -112,8 +116,6 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
                 {item.parentTaskPath && !allItems.some(p=>p.path===item.parentTaskPath) && <option value={item.parentTaskPath}>{item.parentTaskLabel || item.parentTaskPath}</option>}
                 {allItems.filter(p=>p.kind==='task' && canParent(allItems,item.path,p.path)).map(p=><option key={p.path} value={p.path}>{p.title} · {p.targetDate || '予定日未定'}</option>)}
               </select></label>
-              <button type="button" disabled={!!busy || item.status === 'on_hold'} onClick={() => void move(item,'on_hold')}>保留にする</button>
-              <button type="button" disabled={!!busy || item.status === 'cancelled'} onClick={() => void move(item,'cancelled')}>中止にする</button>
             </div>}
 
           </article>)}
