@@ -10,7 +10,7 @@ class File {
   extension = 'md'; basename: string;
   constructor(public path: string) { this.basename = path.split('/').at(-1)!.replace(/\.md$/, ''); }
 }
-const compiled = build({ entryPoints: [path.resolve('src/store.ts')], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['obsidian'] });
+const compiled = build({loader:{'.md':'text'}, entryPoints: [path.resolve('src/store.ts')], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['obsidian'] });
 async function fixture() {
   const module = { exports: {} as any };
   const require = createRequire(path.join(process.cwd(), 'package.json'));
@@ -19,7 +19,7 @@ async function fixture() {
       parseYaml: (source:string) => source.trim().startsWith('{') ? JSON.parse(source) : ({ tags:['event'],status:'todo','created at':'','last updated':null }),
       stringifyYaml: JSON.stringify,
     } : require(id), Intl, Date, console });
-  const project = new File('notes/P.md'), task = new File('notes/Task 2026-11-06.md'), other = new File('daily_notes/01_daily/not-a-task.md');
+  const project = new File('Daylight/Projects/P.md'), task = new File('Daylight/Tasks/Task 2026-11-06.md'), other = new File('daily_Daylight/Tasks/01_daily/not-a-task.md');
   const fm = new Map<string, any>([
     [project.path, { tags: ['project'], status: 'on_going' }],
     [task.path, { tags: ['task'], status: 'todo', target_date: '2026-11-06', schedule_start: '2026-11-06T09:00:00', schedule_end: '2026-11-06T10:00:00', project: '[[P]]', custom: 'preserve' }],
@@ -28,14 +28,14 @@ async function fixture() {
   const bodies = new Map([[task.path, `---\n${JSON.stringify(fm.get(task.path))}\n---\n\n## Notes\n\n- existing\n\n## 派生タスク(Child Tasks)\n- child\n`]]);
   const files = [project, task, other];
   const trashed = new Map<string,string>(); const renames: string[][] = [];
-  const template = new File('etc/Templates/Event.md');
-  const templates = [template, new File('etc/Templates/Task.md'), new File('etc/Templates/Project.md')];
+  const template = new File('Daylight/Templates/Event.md');
+  const templates = [template, new File('Daylight/Templates/Task.md'), new File('Daylight/Templates/Project.md')];
   const app = {
     metadataCache: { on: () => ({}), getFileCache: (f: File) => ({ frontmatter: fm.get(f.path) }),
       getFirstLinkpathDest: (link: string) => files.find(f=>f.path.replace(/\.md$/,'')===link||f.basename===link)??null },
     vault: { on: () => ({}), getMarkdownFiles: () => files,
       getAbstractFileByPath: (p: string) => templates.find(f => f.path === p) ?? files.find(f => f.path === p),
-      read: async (f: File) => templates.includes(f) ? readFileSync('../../../'+f.path,'utf8') : bodies.get(f.path) ?? '',
+      read: async (f: File) => templates.includes(f) ? readFileSync('templates/'+f.path.split('/').at(-1),'utf8') : bodies.get(f.path) ?? '',
       create: async (p:string,content:string) => {
         if (files.some(f=>f.path===p)) throw new Error('File already exists');
         const file=new File(p);files.push(file);bodies.set(p,content);
@@ -59,7 +59,7 @@ async function fixture() {
     },
   };
   const store = new module.exports.DaylightStore(app, { registerEvent() {}, register() {} });
-  return { store, fm, bodies, task, project, files, app, trashed, renames };
+  return { store, fm, bodies, task, project, files, app, trashed, renames, templates };
 }
 test('frontmatter kinds, project resolution, scheduled tasks and scope', async () => {
   const {store, task, project}=await fixture();
@@ -84,7 +84,7 @@ test('multiple memo writes serialize on latest content and retain template secti
   assert.ok(content.includes('first'));assert.ok(content.includes('second'));
   assert.ok(content.includes('## 派生タスク(Child Tasks)\n- child'));
   assert.ok((await store.notes(task.path)).includes('existing'));
-  await assert.rejects(()=>store.memo('notes/deleted.md','lost'),/見つかりません/);
+  await assert.rejects(()=>store.memo('Daylight/Tasks/deleted.md','lost'),/見つかりません/);
 });
 test('deleted notes and multi-kind or malformed-tag notes are handled safely', async () => {
   const {store,files,fm,task}=await fixture();
@@ -101,12 +101,12 @@ test('a later external status is not hidden behind the saved UI state', async ()
   fm.get(task.path).status='on_hold';store.invalidate();
   assert.equal(store.items().find((i:any)=>i.path===task.path).status,'on_hold');
 });
-const eventInput={title:'研究ミーティング',start:'2026-11-06T09:03',end:'2026-11-06T10:17',status:'todo',projectPath:'notes/P.md',memo:'準備する'};
+const eventInput={title:'研究ミーティング',start:'2026-11-06T09:03',end:'2026-11-06T10:17',status:'todo',projectPath:'Daylight/Projects/P.md',memo:'準備する'};
 test('new events use the template, canonical project links and minute precision', async () => {
   const {store,fm,bodies}=await fixture();
   const file=await store.createEvent(eventInput);
-  assert.equal(file.path,'notes/研究ミーティング 2026-11-06.md');
-  const data=fm.get(file.path);assert.equal(data.project,'[[notes/P]]');assert.equal(data.target_date,'2026-11-06');
+  assert.equal(file.path,'Daylight/Events/研究ミーティング 2026-11-06.md');
+  const data=fm.get(file.path);assert.equal(data.project,'[[Daylight/Projects/P]]');assert.equal(data.target_date,'2026-11-06');
   assert.equal(data.schedule_start,'2026-11-06T09:03:00');assert.equal(data.schedule_end,'2026-11-06T10:17:00');
   assert.deepEqual(Array.from(data.tags),['event']);assert.ok(bodies.get(file.path)!.includes('## URL'));assert.ok(bodies.get(file.path)!.includes('準備する'));
 });
@@ -114,15 +114,15 @@ test('simultaneous same-name creates get separate files and never overwrite an e
   const {store,bodies}=await fixture();
   const original=await store.createEvent({...eventInput,memo:'original'});
   const [a,b]=await Promise.all([store.createEvent({...eventInput,memo:'second'}),store.createEvent({...eventInput,memo:'third'})]);
-  assert.equal(a.path,'notes/研究ミーティング 2026-11-06 1.md');assert.equal(b.path,'notes/研究ミーティング 2026-11-06 2.md');
+  assert.equal(a.path,'Daylight/Events/研究ミーティング 2026-11-06 1.md');assert.equal(b.path,'Daylight/Events/研究ミーティング 2026-11-06 2.md');
   assert.ok(bodies.get(original.path)!.includes('original'));assert.ok(!bodies.get(original.path)!.includes('second'));
 });
 test('invalid event ranges, missing templates and unresolved projects produce no note', async () => {
   const {store,files,app}=await fixture();const count=files.length;
   await assert.rejects(()=>store.createEvent({...eventInput,end:eventInput.start}),/終了日時/);
-  await assert.rejects(()=>store.createEvent({...eventInput,projectPath:'notes/missing.md'}),/プロジェクト/);
+  await assert.rejects(()=>store.createEvent({...eventInput,projectPath:'Daylight/Tasks/missing.md'}),/プロジェクト/);
   const original=app.vault.getAbstractFileByPath;
-  app.vault.getAbstractFileByPath=p=>p==='etc/Templates/Event.md'?undefined:original(p);
+  app.vault.getAbstractFileByPath=p=>p==='Daylight/Templates/Event.md'?undefined:original(p);
   await assert.rejects(()=>store.createEvent(eventInput),/テンプレート/);
   assert.equal(files.length,count);
 });
@@ -133,7 +133,7 @@ test('existing event edits update exact minute values and preserve body, unknown
   fm.get(file.path).custom='keep';
   bodies.set(file.path,bodies.get(file.path)!.replace(/^---\n\{[^\n]*\}\n---/,`---\n${JSON.stringify(fm.get(file.path))}\n---`));
   const snapshot=await store.loadEvent(file.path);const created=fm.get(file.path)['created at'];
-  assert.equal(snapshot.input.projectPath,'notes/P.md');assert.ok(snapshot.notes.includes('existing memo'));
+  assert.equal(snapshot.input.projectPath,'Daylight/Projects/P.md');assert.ok(snapshot.notes.includes('existing memo'));
   await store.updateEvent(snapshot,{...snapshot.input,start:'2026-11-06T11:07',end:'2026-11-06T12:29',status:'on_going',projectPath:'',memo:'new memo'});
   const data=fm.get(file.path);assert.equal(data.schedule_start,'2026-11-06T11:07:00');assert.equal(data.schedule_end,'2026-11-06T12:29:00');
   assert.equal(data.status,'on_going');assert.equal(data.project,null);assert.equal(data.custom,'keep');assert.equal(data['created at'],created);
@@ -145,7 +145,7 @@ test('date/title edits use FileManager rename and choose a non-colliding name', 
   const existing=await store.createEvent({...eventInput,title:'移動後',start:'2026-11-07T10:00',end:'2026-11-07T11:00',memo:'other note'});
   const snapshot=await store.loadEvent(old);
   await store.updateEvent(snapshot,{...snapshot.input,title:'移動後',start:'2026-11-07T09:05',end:'2026-11-07T10:09'});
-  assert.equal(file.path,'notes/移動後 2026-11-07 1.md');assert.equal(fm.get(file.path).target_date,'2026-11-07');
+  assert.equal(file.path,'Daylight/Events/移動後 2026-11-07 1.md');assert.equal(fm.get(file.path).target_date,'2026-11-07');
   assert.deepEqual(renames,[[old,file.path]]);assert.ok(bodies.get(existing.path)!.includes('other note'));
 });
 test('update/delete reject stale snapshots instead of losing another edit', async () => {
@@ -183,9 +183,9 @@ test('task sidebar updates period, due and additional typed properties while pre
 test('changing target date renames a task, and clearing it produces the TBD filename',async()=>{
   const {store,task,fm,renames}=await fixture();
   await store.updateTask(await store.loadTask(task.path),{target_date:'2026-11-07'});
-  assert.equal(task.path,'notes/Task 2026-11-07.md');assert.equal(fm.get(task.path).target_date,'2026-11-07');
+  assert.equal(task.path,'Daylight/Tasks/Task 2026-11-07.md');assert.equal(fm.get(task.path).target_date,'2026-11-07');
   await store.updateTask(await store.loadTask(task.path),{target_date:null});
-  assert.equal(task.path,'notes/Task TBD.md');assert.equal(fm.get(task.path).target_date,null);assert.equal(renames.length,2);
+  assert.equal(task.path,'Daylight/Tasks/Task TBD.md');assert.equal(fm.get(task.path).target_date,null);assert.equal(renames.length,2);
 });
 test('task edits merge newer memos and unrelated status edits, but reject a changed property conflict',async()=>{
   const {store,task,fm,bodies}=await fixture();const snapshot=await store.loadTask(task.path);
@@ -197,10 +197,10 @@ test('task edits merge newer memos and unrelated status edits, but reject a chan
 test('parent task links reject self/indirect cycles and wrong entity kinds',async()=>{
   const {store,task,app}=await fixture();const snapshot=await store.loadTask(task.path);
   await assert.rejects(()=>store.updateTask(snapshot,{parent_task:`[[${task.path.replace(/\.md$/,'')}]]`}),/循環/);
-  const parent='notes/Parent TBD.md';
+  const parent='Daylight/Tasks/Parent TBD.md';
   await app.vault.create(parent,`---\n${JSON.stringify({tags:['task'],status:'todo',parent_task:`[[${task.path.replace(/\.md$/,'')}]]`})}\n---\n\n## Notes\n`);store.invalidate();
-  await assert.rejects(()=>store.updateTask(snapshot,{parent_task:'[[notes/Parent TBD]]'}),/循環/);
-  await assert.rejects(()=>store.updateTask(snapshot,{project:'[[notes/Parent TBD]]'}),/プロジェクト/);
+  await assert.rejects(()=>store.updateTask(snapshot,{parent_task:'[[Daylight/Tasks/Parent TBD]]'}),/循環/);
+  await assert.rejects(()=>store.updateTask(snapshot,{project:'[[Daylight/Tasks/Parent TBD]]'}),/プロジェクト/);
 });
 test('task rename failure restores previous content while preserving other properties',async()=>{
   const {store,task,bodies,app}=await fixture();const snapshot=await store.loadTask(task.path),before=bodies.get(task.path);
@@ -226,15 +226,15 @@ test('existing completed tasks without a timestamp are not assigned a guessed co
 });
 
 
-const taskInput = {title:'追加タスク',status:'todo',targetDate:'2026-11-08',start:'',end:'',due:'',projectPath:'notes/P.md',parentPath:'',memo:'最初のメモ'};
-const projectInput = {title:'追加プロジェクト',status:'todo',parentPath:'notes/P.md',workingFolder:'/work/research',goal:'成果をまとめる',memo:'検討メモ'};
+const taskInput = {title:'追加タスク',status:'todo',targetDate:'2026-11-08',start:'',end:'',due:'',projectPath:'Daylight/Projects/P.md',parentPath:'',memo:'最初のメモ'};
+const projectInput = {title:'追加プロジェクト',status:'todo',parentPath:'Daylight/Projects/P.md',workingFolder:'/work/research',goal:'成果をまとめる',memo:'検討メモ'};
 test('task creation expands the real template, preserves headings and uses explicit relations and dates', async () => {
   const {store,fm,bodies,task} = await fixture();
   const file = await store.createTask({...taskInput,parentPath:task.path,start:'2026-11-08T10:01',end:'2026-11-08T11:02',due:'2026-11-10T18:00'});
-  assert.equal(file.path,'notes/追加タスク 2026-11-08.md');
+  assert.equal(file.path,'Daylight/Tasks/追加タスク 2026-11-08.md');
   const props = fm.get(file.path), body = bodies.get(file.path)!;
   assert.equal(props.tags.includes('task'),true); assert.equal(props.tags.includes('event'),false);
-  assert.equal(props.project,'[[notes/P]]'); assert.equal(props.parent_task,'[[notes/Task 2026-11-06]]');
+  assert.equal(props.project,'[[Daylight/Projects/P]]'); assert.equal(props.parent_task,'[[Daylight/Tasks/Task 2026-11-06]]');
   assert.equal(props.schedule_start,'2026-11-08T10:01:00'); assert.equal(props.schedule_end,'2026-11-08T11:02:00');
   assert.equal(props.due,'2026-11-10T18:00:00'); assert.equal(props.target_date,'2026-11-08');
   assert.ok(body.includes('## Notes')); assert.ok(body.includes('## 派生タスク(Child Tasks)')); assert.ok(body.includes('最初のメモ')); assert.ok(!body.includes('<%'));
@@ -243,29 +243,29 @@ test('unscheduled tasks use TBD, collisions never overwrite, and done tasks get 
   const {store,fm,bodies} = await fixture();
   const seed = {...taskInput,targetDate:'',projectPath:'',status:'done'};
   const files = await Promise.all([store.createTask(seed),store.createTask(seed)]);
-  assert.equal(files[0].path,'notes/追加タスク TBD.md'); assert.equal(files[1].path,'notes/追加タスク TBD 1.md');
+  assert.equal(files[0].path,'Daylight/Tasks/追加タスク TBD.md'); assert.equal(files[1].path,'Daylight/Tasks/追加タスク TBD 1.md');
   assert.equal(fm.get(files[0].path).target_date,null); assert.equal(fm.get(files[0].path).project,null);
   assert.ok(fm.get(files[0].path)['completed at']); assert.ok(bodies.get(files[0].path));
 });
 test('project creation preserves template sections, parent and goal without inventing task dates', async () => {
   const {store,fm,bodies} = await fixture();
   const file = await store.createProject(projectInput);
-  assert.equal(file.path,'notes/追加プロジェクト.md');
+  assert.equal(file.path,'Daylight/Projects/追加プロジェクト.md');
   const props = fm.get(file.path), body = bodies.get(file.path)!;
-  assert.equal(props.parent_project,'[[notes/P]]'); assert.equal(props.working_folder,'/work/research');
+  assert.equal(props.parent_project,'[[Daylight/Projects/P]]'); assert.equal(props.working_folder,'/work/research');
   assert.equal(props.status,'todo'); assert.equal(props.target_date,undefined); assert.equal(props.archived,undefined);
   for (const text of ['## ゴール','成果をまとめる','## 目標','## 完了条件','## TODO','## Event','## Achieved','検討メモ']) assert.ok(body.includes(text),text);
-  const again = await store.createProject(projectInput); assert.equal(again.path,'notes/追加プロジェクト 1.md');
+  const again = await store.createProject(projectInput); assert.equal(again.path,'Daylight/Projects/追加プロジェクト 1.md');
 });
 test('invalid task/project input and stale relation targets never create notes', async () => {
   const {store,files,app} = await fixture(); const count = files.length;
-  for (const patch of [{title:'../bad'},{targetDate:'2026-02-30'},{start:'2026-11-08T10:00'}, {start:'2026-11-08T10:00',end:'2026-11-08T09:00'}, {due:'tomorrow'}, {projectPath:'notes/missing.md'}, {parentPath:'notes/P.md'}, {status:'invalid'}]) {
+  for (const patch of [{title:'../bad'},{targetDate:'2026-02-30'},{start:'2026-11-08T10:00'}, {start:'2026-11-08T10:00',end:'2026-11-08T09:00'}, {due:'tomorrow'}, {projectPath:'Daylight/Tasks/missing.md'}, {parentPath:'Daylight/Projects/P.md'}, {status:'invalid'}]) {
     await assert.rejects(()=>store.createTask({...taskInput,...patch}));
   }
-  await assert.rejects(()=>store.createProject({...projectInput,parentPath:'notes/Task 2026-11-06.md'}));
+  await assert.rejects(()=>store.createProject({...projectInput,parentPath:'Daylight/Tasks/Task 2026-11-06.md'}));
   assert.equal(files.length,count);
   const get = app.vault.getAbstractFileByPath;
-  app.vault.getAbstractFileByPath = (p:string) => p.startsWith('etc/Templates/') ? undefined : get(p);
+  app.vault.getAbstractFileByPath = (p:string) => p.startsWith('Daylight/Templates/') ? undefined : get(p);
   await assert.rejects(()=>store.createTask(taskInput),/Taskテンプレートが見つかりません/);
   await assert.rejects(()=>store.createProject(projectInput),/Projectテンプレートが見つかりません/);
   assert.equal(files.length,count);
@@ -297,7 +297,7 @@ test('deletion rejects stale content, wrong identity, missing notes and trash fa
   bodies.set(task.path,snapshot.content);
   await assert.rejects(()=>store.loadDeleteSnapshot({...item,kind:'project'}),/種類が変わっています/);
   await assert.rejects(()=>store.deleteNote({...snapshot,kind:'project'}),/種類が変わっています/);
-  await assert.rejects(()=>store.deleteNote({...snapshot,path:'daily_notes/01_daily/not-a-task.md'}),/見つかりません/);
+  await assert.rejects(()=>store.deleteNote({...snapshot,path:'daily_Daylight/Tasks/01_daily/not-a-task.md'}),/見つかりません/);
   app.fileManager.trashFile=async()=>{throw new Error('trash unavailable');};
   await assert.rejects(()=>store.deleteNote(snapshot),/trash unavailable/);
   assert.equal(bodies.get(task.path),snapshot.content); assert.equal(trashed.size,0);
@@ -370,12 +370,12 @@ test('dragging todo to ongoing and done records actual timestamps through the co
 
 test('setting a parent preserves child state, work timestamps, schedule and body, and resolves hierarchy',async()=>{
   const {store,task,app,fm,bodies}=await fixture();
-  const parent=await app.vault.create('notes/Parent TBD.md',`---\n${JSON.stringify({tags:['task'],status:'on_hold'})}\n---\n\n## Notes\n`);store.invalidate();
+  const parent=await app.vault.create('Daylight/Tasks/Parent TBD.md',`---\n${JSON.stringify({tags:['task'],status:'on_hold'})}\n---\n\n## Notes\n`);store.invalidate();
   await store.startTask(store.items().find((i:any)=>i.path===task.path));
   const before={...fm.get(task.path)},body=bodies.get(task.path)!.split('\n---\n')[1];
   await store.setParentTask(store.items().find((i:any)=>i.path===task.path),parent.path);
   const current=fm.get(task.path);
-  assert.equal(current.parent_task,'[[notes/Parent TBD]]');
+  assert.equal(current.parent_task,'[[Daylight/Tasks/Parent TBD]]');
   for(const key of ['status','task_start','task_end','schedule_start','schedule_end','project'])assert.equal(current[key],before[key],key);
   assert.equal(bodies.get(task.path)!.split('\n---\n')[1],body);
   assert.equal(store.items().find((i:any)=>i.path===task.path).parentTaskPath,parent.path);
@@ -384,7 +384,7 @@ test('setting a parent preserves child state, work timestamps, schedule and body
 });
 test('parent validation checks file content even if metadata cache has not caught up',async()=>{
   const {store,task,app,bodies}=await fixture();
-  const parent=await app.vault.create('notes/Parent TBD.md',`---\n${JSON.stringify({tags:['task'],status:'todo'})}\n---\n\n## Notes\n`);store.invalidate();
+  const parent=await app.vault.create('Daylight/Tasks/Parent TBD.md',`---\n${JSON.stringify({tags:['task'],status:'todo'})}\n---\n\n## Notes\n`);store.invalidate();
   bodies.set(parent.path,`---\n${JSON.stringify({tags:['task'],status:'todo',parent_task:`[[${task.path.replace(/\.md$/,'')}]]`})}\n---\n\n## Notes\n`);
   await assert.rejects(()=>store.setParentTask(store.items().find((i:any)=>i.path===task.path),parent.path),/循環/);
 });
@@ -394,12 +394,12 @@ test('project changes from the card menu update only project and allow clearing 
   const row=()=>store.items().find((i:any)=>i.path===task.path);
   await store.startTask(row());const before={...fm.get(task.path)},body=bodies.get(task.path)!.split('\n---\n')[1];
   await store.setTaskProject(row(),'');assert.equal(fm.get(task.path).project,null);
-  await store.setTaskProject(row(),project.path);assert.equal(fm.get(task.path).project,'[[notes/P]]');
+  await store.setTaskProject(row(),project.path);assert.equal(fm.get(task.path).project,'[[Daylight/Projects/P]]');
   for(const key of ['status','task_start','task_end','target_date','schedule_start','schedule_end','parent_task','custom'])assert.equal(fm.get(task.path)[key],before[key],key);
   assert.equal(bodies.get(task.path)!.split('\n---\n')[1],body);
   await assert.rejects(()=>store.setTaskProject(row(),task.path),/プロジェクト/);
-  await assert.rejects(()=>store.setTaskProject(row(),'notes/deleted.md'),/プロジェクト/);
-  assert.equal(fm.get(task.path).project,'[[notes/P]]');
+  await assert.rejects(()=>store.setTaskProject(row(),'Daylight/Tasks/deleted.md'),/プロジェクト/);
+  assert.equal(fm.get(task.path).project,'[[Daylight/Projects/P]]');
 });
 
 test('creating in an ongoing column initializes the same actual start as starting a task',async()=>{
@@ -407,4 +407,24 @@ test('creating in an ongoing column initializes the same actual start as startin
   const file=await store.createTask({...taskInput,status:'on_going'});
   const props=fm.get(file.path);assert.equal(props.status,'on_going');assert.ok(props.task_start);assert.equal(props.task_end,null);assert.equal(props.schedule_start,null);
   const done=await store.createTask({...taskInput,status:'done'});assert.ok(fm.get(done.path).task_end);assert.ok(fm.get(done.path)['completed at']);
+});
+
+test('custom root routes reading, creating and date-based renaming to the configured kind folders',async()=>{
+  const {store:original,files,templates,fm,bodies,app}=await fixture();
+  for(const file of [...files,...templates]) {
+    const old=file.path;file.path=old.replace(/^Daylight\//,'etc/Daylight/');
+    if(fm.has(old)){fm.set(file.path,fm.get(old));fm.delete(old);}
+    if(bodies.has(old)){bodies.set(file.path,bodies.get(old)!);bodies.delete(old);}
+  }
+  const store=new original.constructor(app,{registerEvent(){},register(){}},'/etc/Daylight');
+  assert.equal(store.items().length,2);
+  const task=await store.createTask({...taskInput,projectPath:'etc/Daylight/Projects/P.md'});
+  assert.equal(task.path,'etc/Daylight/Tasks/追加タスク 2026-11-08.md');
+  const snapshot=await store.loadTask(task.path);const updated=await store.updateTask(snapshot,{target_date:'2026-11-10'});
+  assert.equal(updated.path,'etc/Daylight/Tasks/追加タスク 2026-11-10.md');
+  const event=await store.createEvent({...eventInput,projectPath:'etc/Daylight/Projects/P.md'});
+  assert.equal(event.path,'etc/Daylight/Events/研究ミーティング 2026-11-06.md');
+  const project=await store.createProject({...projectInput,parentPath:''});assert.equal(project.path,'etc/Daylight/Projects/追加プロジェクト.md');
+  const outsider=new File('notes/TaskOutside.md');files.push(outsider);fm.set(outsider.path,{tags:['task'],status:'todo'});store.invalidate();
+  assert.ok(!store.items().some((i:any)=>i.path===outsider.path));
 });

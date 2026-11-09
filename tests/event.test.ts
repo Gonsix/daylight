@@ -32,7 +32,7 @@ test('invalid titles, missing/inverted dates and sub-minute values cannot be sav
   for (const patch of [{title:''},{title:'../escape'},{start:''},{end:'2026-11-06T09:00'},{end:'2026-11-06T10:17:01'},{status:'unknown'}]) assert.throws(()=>validateEvent({...input,...patch}));
 });
 test('real Event template is expanded, attributes preserved and memo appended without altering URL', () => {
-  const template=readFileSync('../../../etc/Templates/Event.md','utf8');
+  const template=readFileSync('templates/Event.md','utf8');
   let fm:any;
   const result=renderEvent(template,{...input,memo:'打ち合わせの準備'},'[[notes/研究]]','2026-11-06',{
     parse:()=>({tags:['event','meeting'],status:'todo','created at':'', 'last updated':null, custom:'keep'}),

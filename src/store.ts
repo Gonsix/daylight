@@ -1,4 +1,5 @@
 import { App, Plugin, TFile, parseYaml, stringifyYaml } from 'obsidian';
+import { DaylightStorage } from './storage';
 import { EventInput, EventSnapshot, KEEP_PROJECT, eventDocument, renderEvent, updateEventDocument, validateEvent } from './event';
 import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesText, timeLabel, titleFor } from './model';
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
@@ -9,12 +10,15 @@ export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; conten
 
 export class DaylightStore {
   kanbanEnabled = false;
+  readonly storage: DaylightStorage;
+  private storageChanging = false;
   private listeners = new Set<() => void>();
   private revision = 0;
   private pending = new Map<string, Promise<unknown>>();
   private overrides = new Map<string, { status: string; previous: string }>();
   private cache: Item[] | null = null;
-  constructor(public app: App, plugin: Plugin) {
+  constructor(public app: App, plugin: Plugin, root = 'Daylight') {
+    this.storage = new DaylightStorage(app,root);
     const update = () => { this.cache = null; this.revision++; for (const fn of this.listeners) fn(); };
     plugin.registerEvent(app.metadataCache.on('changed', update));
     plugin.registerEvent(app.metadataCache.on('resolved', update));
@@ -30,7 +34,7 @@ export class DaylightStore {
   snapshot = () => this.revision;
   items(): Item[] {
     if (this.cache) return this.cache;
-    this.cache = this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith('notes/')).flatMap(file => {
+    this.cache = this.app.vault.getMarkdownFiles().filter(f => this.storage.kind(f.path) !== null).flatMap(file => {
       const cached = this.app.metadataCache.getFileCache(file), fm = cached?.frontmatter;
       if (!fm) return [];
       const tags: string[] = Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [];
@@ -38,6 +42,7 @@ export class DaylightStore {
       const kinds = (['task', 'event', 'project'] as Kind[]).filter(k => allTags.includes(k));
       if (kinds.length !== 1) return [];
       const kind = kinds[0];
+      if(this.storage.kind(file.path)!==kind)return [];
       const raw = typeof fm.status === 'string' ? fm.status.trim() : '';
       const override = this.overrides.get(file.path);
       // Hold the result only while metadata still contains our previous value.
@@ -63,14 +68,30 @@ export class DaylightStore {
   }
   private file(path: string): TFile {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile) || file.extension !== 'md' || !path.startsWith('notes/')) throw new Error('ノートが見つかりません。');
+    if (!(file instanceof TFile) || file.extension !== 'md' || this.storage.kind(path) === null) throw new Error('ノートが見つかりません。');
     return file;
   }
   private async queue(path: string, work: () => Promise<void>) {
+    if(this.storageChanging)throw new Error('Daylightフォルダを移動中です。完了後にもう一度お試しください。');
     const previous = this.pending.get(path) ?? Promise.resolve();
     const task = previous.catch(() => {}).then(work);
     this.pending.set(path, task);
     try { await task; } finally { if (this.pending.get(path) === task) this.pending.delete(path); }
+  }
+  async relocateRoot(next: string, save: () => Promise<void>) {
+    if(this.storageChanging)throw new Error('Daylightフォルダを移動中です。');
+    this.storageChanging=true;
+    const previous=this.storage.root;
+    try {
+      await Promise.allSettled([...this.pending.values()]);
+      await this.storage.moveRoot(next);
+      try {await save();}
+      catch(error) {
+        try {await this.storage.moveRoot(previous);}
+        catch {throw new Error(`設定を保存できず、フォルダは ${this.storage.root} に移動済みです。配置場所を確認してください。`);}
+        throw error;
+      }
+    } finally {this.storageChanging=false;this.invalidate();}
   }
   async setStatus(item: Item, status: string) {
     if (!isStatus(status)) throw new Error('状態を選択してください。');
@@ -152,9 +173,9 @@ export class DaylightStore {
     if (!project) throw new Error('プロジェクトを選び直してください。');
     return `[[${this.file(project.path).path.replace(/\.md$/, '')}]]`;
   }
-  private uniqueEventPath(stem: string, currentPath = ''): string {
+  private uniqueEventPath(stem: string, kind: Kind, currentPath = ''): string {
     for (let suffix = 0; suffix < 10000; suffix++) {
-      const candidate = `notes/${stem}${suffix ? ` ${suffix}` : ''}.md`;
+      const candidate = `${this.storage.folder(kind)}/${stem}${suffix ? ` ${suffix}` : ''}.md`;
       if (candidate === currentPath || !this.app.vault.getAbstractFileByPath(candidate)) return candidate;
     }
     throw new Error('重複しないノート名を確保できませんでした。');
@@ -219,7 +240,7 @@ export class DaylightStore {
       if (Object.hasOwn(patch,'parent_task') && !equal(patch.parent_task,snapshot.properties.parent_task)) await this.validateParentChain(patch.parent_task,snapshot.path);
       const before=await this.app.vault.read(file),preview=mergeTaskProperties(before,snapshot,patch,yaml);
       const rename=preview.changed.includes('target_date')&&dateValue(preview.properties.target_date)!==dateValue(taskDocument(before,yaml).fm.target_date);
-      const destination=rename?this.uniqueEventPath(`${titleFor(file.basename,'task')} ${dateValue(preview.properties.target_date)||'TBD'}`,file.path):file.path;
+      const destination=rename?this.uniqueEventPath(`${titleFor(file.basename,'task')} ${dateValue(preview.properties.target_date)||'TBD'}`,'task',file.path):file.path;
       let previous='',updated='';
       await this.app.vault.process(file,latest=>{
         previous=latest;updated=mergeTaskProperties(latest,snapshot,patch,yaml).content;return updated;
@@ -264,7 +285,7 @@ export class DaylightStore {
       const project = input.projectPath === KEEP_PROJECT ? fm.project : this.projectLink(input.projectPath) || null;
       const updated = updateEventDocument(snapshot.content, input, project, { parse: parseYaml, stringify: stringifyYaml }, `${dayKey()} ${timeLabel(Date.now())}`);
       const rename = checked.title !== snapshot.input.title || checked.start.slice(0,10) !== dateValue(fm.target_date);
-      const destination = rename ? this.uniqueEventPath(`${checked.title} ${checked.start.slice(0,10)}`, file.path) : file.path;
+      const destination = rename ? this.uniqueEventPath(`${checked.title} ${checked.start.slice(0,10)}`, 'event', file.path) : file.path;
       await this.app.vault.process(file, latest => {
         if (latest !== snapshot.content) throw new Error('ノートが更新されています。予定を開き直してください。');
         return updated;
@@ -300,11 +321,11 @@ export class DaylightStore {
     let result: TFile | undefined;
     await this.queue('__event_mutations__', async () => {
       const name = kind === 'task' ? 'Task' : 'Project';
-      const template = this.app.vault.getAbstractFileByPath(`etc/Templates/${name}.md`);
+      const template = this.app.vault.getAbstractFileByPath(this.storage.template(kind));
       if (!(template instanceof TFile)) throw new Error(`${name}テンプレートが見つかりません。`);
       const content = renderCreatedNote(await this.app.vault.read(template), kind, properties(), memo, dayKey(), { parse: parseYaml, stringify: stringifyYaml }, goal);
       for (let suffix = 0; suffix < 10000; suffix++) {
-        const path = `notes/${stem}${suffix ? ` ${suffix}` : ''}.md`;
+        const path = `${this.storage.folder(kind)}/${stem}${suffix ? ` ${suffix}` : ''}.md`;
         if (this.app.vault.getAbstractFileByPath(path)) continue;
         try { result = await this.app.vault.create(path, content); break; }
         catch (error) { if (!this.app.vault.getAbstractFileByPath(path)) throw error; }
@@ -332,13 +353,13 @@ export class DaylightStore {
     const checked = validateEvent(input);
     let result: TFile | undefined;
     await this.queue('__event_mutations__', async () => {
-      const template = this.app.vault.getAbstractFileByPath('etc/Templates/Event.md');
+      const template = this.app.vault.getAbstractFileByPath(this.storage.template('event'));
       if (!(template instanceof TFile)) throw new Error('Eventテンプレートが見つかりません。');
       const projectLink = this.projectLink(input.projectPath);
       const content = renderEvent(await this.app.vault.read(template), input, projectLink, dayKey(), { parse: parseYaml, stringify: stringifyYaml });
       const stem = `${checked.title} ${checked.start.slice(0, 10)}`;
       for (let suffix = 0; suffix < 10000; suffix++) {
-        const path = `notes/${stem}${suffix ? ` ${suffix}` : ''}.md`;
+        const path = `${this.storage.folder('event')}/${stem}${suffix ? ` ${suffix}` : ''}.md`;
         if (this.app.vault.getAbstractFileByPath(path)) continue;
         try { result = await this.app.vault.create(path, content); break; }
         catch (error) {

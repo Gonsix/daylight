@@ -5,15 +5,26 @@ import { Daylight } from './Daylight';
 import { DaylightStore } from './store';
 import { validDay } from './model';
 import { DAYLIGHT_ICON, DAYLIGHT_ICON_SVG } from './icon';
+import { DEFAULT_ROOT, storageRoot } from './storage';
 
 const VIEW_TYPE = 'daylight';
-interface DaylightSettings { openOnStartup: boolean; enableKanban: boolean }
-const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, enableKanban: false };
+interface DaylightSettings { openOnStartup: boolean; enableKanban: boolean; rootFolder: string }
+const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, enableKanban: false, rootFolder: DEFAULT_ROOT };
 
 class DaylightSettingTab extends PluginSettingTab {
   constructor(private dashboard: DaylightPlugin) { super(dashboard.app, dashboard); }
   display() {
     this.containerEl.empty();
+    let root = this.dashboard.settings.rootFolder;
+    new Setting(this.containerEl).setName('Daylightフォルダの配置場所')
+      .setDesc('Vault内の配置場所です。保存するとタスク・予定・プロジェクト・テンプレートをまとめて移動します。例: Daylight / etc/Daylight')
+      .addText(text => text.setPlaceholder('Daylight').setValue(root).onChange(value => {root=value;}))
+      .addButton(button => button.setButtonText('保存して移動').onClick(async () => {
+        button.setDisabled(true);
+        try {await this.dashboard.changeRootFolder(root);new Notice('Daylightフォルダの配置場所を保存しました。');this.display();}
+        catch(error) {new Notice((error as Error).message);}
+        finally {button.setDisabled(false);}
+      }));
     for (const [key, name, desc] of [
       ['openOnStartup', '起動時にDaylightを開く', 'Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。'],
       ['enableKanban', 'カンバンビューを有効にする', 'タスクをカンバン形式で表示します。オフにするとリスト表示に戻ります。保留・中止の列は必要なときに開けます。'],
@@ -65,9 +76,10 @@ export default class DaylightPlugin extends Plugin {
   async onload() {
     addIcon(DAYLIGHT_ICON, DAYLIGHT_ICON_SVG);
     const saved = await this.loadData();
-    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, enableKanban: typeof saved?.enableKanban === 'boolean' ? saved.enableKanban : DEFAULT_SETTINGS.enableKanban };
+    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, enableKanban: typeof saved?.enableKanban === 'boolean' ? saved.enableKanban : DEFAULT_SETTINGS.enableKanban, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT };
     this.addSettingTab(new DaylightSettingTab(this));
-    this.store = new DaylightStore(this.app, this);
+    this.store = new DaylightStore(this.app, this, this.settings.rootFolder);
+    await this.store.storage.ensure();
     this.store.kanbanEnabled = this.settings.enableKanban;
     this.registerView(VIEW_TYPE, leaf => new DaylightView(leaf, this.store));
     const open = async () => {
@@ -111,5 +123,14 @@ export default class DaylightPlugin extends Plugin {
     await this.saveData(this.settings);
     this.store.kanbanEnabled = this.settings.enableKanban;
     this.store.invalidate();
+  }
+  async changeRootFolder(value: string) {
+    const next=storageRoot(value),previous=this.settings.rootFolder;
+    if(next===previous)return;
+    await this.store.relocateRoot(next,async()=>{
+      this.settings.rootFolder=next;
+      try {await this.saveSettings();}
+      catch(error) {this.settings.rootFolder=previous;throw error;}
+    });
   }
 }

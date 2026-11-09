@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
 async function loadPlugin(saved: any = null, existing: any[] = []) {
-  const result=await build({entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const result=await build({loader:{'.md':'text'},entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
   const registrations:any={};
   class Plugin {
     app:any; registerEvent() {} register(callback:any) { registrations.cleanup = callback; }
@@ -18,14 +18,17 @@ async function loadPlugin(saved: any = null, existing: any[] = []) {
     addCommand(command:any){registrations.command=command;}
     registerMarkdownCodeBlockProcessor(type:string,callback:any){registrations.markdown={type,callback};(registrations.markdowns??={})[type]=callback;}
   }
+  class TFile {constructor(public path:string){}}
+  class TFolder {constructor(public path:string){}}
+  const storageFiles=new Map<string,any>();
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
   vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console,Intl,Date,
-    require:(id:string)=>id==='obsidian'?{addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class{},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
+    require:(id:string)=>id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class{},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
   const plugin=new module.exports.default();
-  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({})},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=callback;},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
+  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=callback;},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
   await plugin.onload();
-  return { plugin, registrations };
+  return { plugin, registrations, storageFiles };
 }
 
 test('plugin loads and registers independent view, command and date-aware Markdown embeds', async () => {
@@ -99,4 +102,14 @@ test('kanban preference defaults off, persists, and updates existing store subsc
   assert.equal(loaded.plugin.store.kanbanEnabled,true);
   const invalid=await loadPlugin({enableKanban:'true'});
   assert.equal(invalid.plugin.store.kanbanEnabled,false);
+});
+
+
+test('saved root configuration is normalized and initialized on installation',async()=>{
+  const {plugin,storageFiles,registrations}=await loadPlugin({rootFolder:'/etc/Daylight/',enableKanban:true});
+  assert.equal(plugin.settings.rootFolder,'etc/Daylight');assert.equal(plugin.store.storage.root,'etc/Daylight');
+  for(const name of ['Tasks','Events','Projects','Templates'])assert.ok(storageFiles.has(`etc/Daylight/${name}`));
+  for(const name of ['Task','Event','Project'])assert.ok(storageFiles.has(`etc/Daylight/Templates/${name}.md`));
+  assert.equal(storageFiles.has('Daylight'),false);
+  await plugin.saveSettings();assert.equal(registrations.saved.rootFolder,'etc/Daylight');
 });
