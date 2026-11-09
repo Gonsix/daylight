@@ -79,7 +79,6 @@ export default class DaylightPlugin extends Plugin {
     if (saved && Object.hasOwn(saved,'enableKanban')) await this.saveData(this.settings);
     this.addSettingTab(new DaylightSettingTab(this));
     this.store = new DaylightStore(this.app, this, this.settings.rootFolder);
-    await this.store.storage.ensure();
     this.registerView(VIEW_TYPE, leaf => new DaylightView(leaf, this.store));
     const open = async () => {
       const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -91,9 +90,19 @@ export default class DaylightPlugin extends Plugin {
     this.addCommand({ id: 'open-daylight', name: 'Daylightを開く', callback: () => void open() });
     let active = true;
     this.register(() => { active = false; });
-    this.app.workspace.onLayoutReady(() => {
+    this.app.workspace.onLayoutReady(async () => {
+      if (!active) return;
+      // Vault files may not be available during onload. Register the view first
+      // so Obsidian can restore it, then install folders once layout is ready.
+      try {
+        await this.store.storage.ensure();
+        if (active) this.store.invalidate();
+      } catch (error) {
+        console.error('Daylight: フォルダの初期化に失敗しました。', error);
+        if (active) new Notice('Daylightフォルダを準備できませんでした。設定の配置場所と書き込み権限を確認してください。');
+      }
       if (active && this.settings.openOnStartup) {
-        void open().catch(error => {
+        await open().catch(error => {
           console.error('Daylight: 起動時の表示に失敗しました。', error);
           new Notice('Daylightを開けませんでした。コマンドから開き直してください。');
         });

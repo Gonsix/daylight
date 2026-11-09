@@ -5,9 +5,10 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
-async function loadPlugin(saved: any = null, existing: any[] = []) {
+async function loadPlugin(saved: any = null, existing: any[] = [], storageError?: Error) {
   const result=await build({loader:{'.md':'text'},entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
-  const registrations:any={};
+  const registrations:any={notices:[],errors:[]};
+  let layoutReady=false;
   class Plugin {
     app:any; registerEvent() {} register(callback:any) { registrations.cleanup = callback; }
     async loadData() { return saved; }
@@ -23,10 +24,10 @@ async function loadPlugin(saved: any = null, existing: any[] = []) {
   const storageFiles=new Map<string,any>();
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console,Intl,Date,
-    require:(id:string)=>id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class{},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,
+    require:(id:string)=>id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
   const plugin=new module.exports.default();
-  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=callback;},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
+  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{if(!layoutReady)throw new Error('Vault not ready');if(storageError)throw storageError;storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=()=>{layoutReady=true;return callback();};},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
   await plugin.onload();
   return { plugin, registrations, storageFiles };
 }
@@ -54,7 +55,7 @@ test('startup waits for layout readiness and reuses the restored dashboard tab',
   const existing = {};
   const { registrations } = await loadPlugin({ openOnStartup: true }, [existing]);
   assert.equal(registrations.revealed, undefined);
-  registrations.ready();
+  await registrations.ready();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(registrations.revealed, existing);
   assert.equal(registrations.opened, undefined);
@@ -62,7 +63,7 @@ test('startup waits for layout readiness and reuses the restored dashboard tab',
 
 test('startup opens a dedicated tab when enabled and none was restored', async () => {
   const { registrations } = await loadPlugin({ openOnStartup: true });
-  registrations.ready();
+  await registrations.ready();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(registrations.opened.type, 'daylight');
   assert.equal(registrations.opened.active, true);
@@ -71,12 +72,12 @@ test('startup opens a dedicated tab when enabled and none was restored', async (
 test('startup stays off by default, for disabled or invalid settings, and after unload', async () => {
   for (const saved of [null, { openOnStartup: false }, { openOnStartup: 'true' }]) {
     const { registrations } = await loadPlugin(saved);
-    registrations.ready();
+    await registrations.ready();
     assert.equal(registrations.opened, undefined);
   }
   const { registrations } = await loadPlugin({ openOnStartup: true });
   registrations.cleanup();
-  registrations.ready();
+  await registrations.ready();
   assert.equal(registrations.opened, undefined);
 });
 
@@ -100,9 +101,28 @@ test('obsolete kanban preference is discarded while startup and storage settings
 
 test('saved root configuration is normalized and initialized on installation',async()=>{
   const {plugin,storageFiles,registrations}=await loadPlugin({rootFolder:'/etc/Daylight/'});
+  assert.equal(storageFiles.size,0);
+  await registrations.ready();
   assert.equal(plugin.settings.rootFolder,'etc/Daylight');assert.equal(plugin.store.storage.root,'etc/Daylight');
   for(const name of ['Tasks','Events','Projects','Templates'])assert.ok(storageFiles.has(`etc/Daylight/${name}`));
   for(const name of ['Task','Event','Project'])assert.ok(storageFiles.has(`etc/Daylight/Templates/${name}.md`));
   assert.equal(storageFiles.has('Daylight'),false);
   await plugin.saveSettings();assert.equal(registrations.saved.rootFolder,'etc/Daylight');
+});
+
+
+test('storage failure after layout does not prevent plugin registration or startup display',async()=>{
+  const {registrations}=await loadPlugin({openOnStartup:true},[],new Error('Storage unavailable'));
+  assert.equal(registrations.view.type,'daylight');
+  await registrations.ready();
+  assert.equal(registrations.opened.type,'daylight');
+  assert.equal(registrations.errors.length,1);
+  assert.ok(registrations.notices.some((message:string)=>message.includes('フォルダ')));
+});
+
+test('unloading before layout skips storage initialization',async()=>{
+  const {registrations,storageFiles}=await loadPlugin();
+  registrations.cleanup();
+  await registrations.ready();
+  assert.equal(storageFiles.size,0);
 });
