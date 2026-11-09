@@ -302,3 +302,38 @@ test('deletion rejects stale content, wrong identity, missing notes and trash fa
   await assert.rejects(()=>store.deleteNote(snapshot),/trash unavailable/);
   assert.equal(bodies.get(task.path),snapshot.content); assert.equal(trashed.size,0);
 });
+
+test('play/stop atomically save actual timestamps and state, preserving schedule, links and body', async()=>{
+  const {store,task,fm,bodies}=await fixture();
+  const before=bodies.get(task.path)!;
+  const row=()=>store.items().find((i:any)=>i.path===task.path);
+  const initial=row();await store.startTask(initial);
+  const started=fm.get(task.path);
+  assert.equal(started.status,'on_going');assert.match(started.task_start,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);assert.equal(started.task_end,null);
+  assert.equal(started.schedule_start,'2026-11-06T09:00:00');assert.equal(started.project,'[[P]]');assert.equal(started.custom,'preserve');
+  assert.equal(bodies.get(task.path)!.slice(bodies.get(task.path)!.indexOf('## Notes')),before.slice(before.indexOf('## Notes')));
+  await assert.rejects(()=>store.startTask(initial),/更新されています/);
+  await store.finishTask(row());
+  const done=fm.get(task.path);assert.equal(done.status,'done');assert.ok(done.task_end);assert.ok(done['completed at']);assert.equal(done.task_start,started.task_start);
+  await assert.rejects(()=>store.finishTask(initial));
+});
+test('execution rejects stale time edits, wrong note kinds and future starts',async()=>{
+  const {store,task,project,fm,bodies}=await fixture();
+  const row=store.items().find((i:any)=>i.path===task.path);
+  await assert.rejects(()=>store.startTask(store.items().find((i:any)=>i.path===project.path)));
+  await store.startTask(row);const running=store.items().find((i:any)=>i.path===task.path);
+  const props={...fm.get(task.path),task_start:'2099-01-01T00:00:00'};
+  bodies.set(task.path,`---\n${JSON.stringify(props)}\n---\n## Notes\n`);fm.set(task.path,props);store.invalidate();
+  await assert.rejects(()=>store.finishTask(running),/更新されています/);
+  await assert.rejects(()=>store.finishTask(store.items().find((i:any)=>i.path===task.path)),/開始時刻より前/);
+  assert.equal(fm.get(task.path).status,'on_going');
+});
+
+test('holding stops the actual block and resuming preserves its original start and schedule',async()=>{
+  const {store,task,fm}=await fixture();const row=()=>store.items().find((i:any)=>i.path===task.path);
+  await store.startTask(row());const original=fm.get(task.path).task_start;
+  await store.setStatus(row(),'on_hold');
+  assert.ok(fm.get(task.path).task_end);assert.equal(fm.get(task.path).status,'on_hold');
+  await store.startTask(row());assert.equal(fm.get(task.path).task_start,original);assert.equal(fm.get(task.path).task_end,null);assert.equal(fm.get(task.path).status,'on_going');
+  await store.setStatus(row(),'done');assert.ok(fm.get(task.path).task_end);assert.ok(fm.get(task.path)['completed at']);assert.equal(fm.get(task.path).schedule_start,'2026-11-06T09:00:00');
+});

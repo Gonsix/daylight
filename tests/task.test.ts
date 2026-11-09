@@ -39,3 +39,12 @@ test('property controls reflect both registered types and the actual value witho
   assert.equal(propertyType('new',null,'checkbox'),'boolean');assert.equal(propertyType('new',null,'yaml'),'yaml');
   assert.equal(propertyType('due',null),'datetime');assert.equal(propertyType('target_date','TBD'),'text');
 });
+
+test('actual work timestamps use datetime controls and reject reversed or missing starts',()=>{
+  assert.equal(propertyType('task_start',null),'datetime');assert.equal(propertyType('task_end',null),'datetime');
+  const valid=mergeTaskProperties(content(),snapshot,{task_start:'2026-11-09T09:00',task_end:'2026-11-09T10:25'},yaml);
+  assert.equal(valid.properties.task_start,'2026-11-09T09:00:00');assert.equal(valid.properties.task_end,'2026-11-09T10:25:00');
+  assert.equal(valid.properties.schedule_start,null);
+  assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_end:'2026-11-09T10:00'},yaml),/作業開始/);
+  assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_start:'2026-11-09T11:00',task_end:'2026-11-09T10:00'},yaml),/作業開始/);
+});

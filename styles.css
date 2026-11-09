@@ -250,3 +250,14 @@
 .vd-app .vd-detail-save-actions .vd-save { margin: 0; }
 .vd-app .vd-detail-delete { padding: 6px 12px; border: 1px solid var(--vd-border); border-radius: 5px; background: transparent; color: var(--text-error, #e89b96); }
 .vd-delete-hint { margin-top: 10px !important; color: var(--vd-muted); font-size: 12px; }
+
+.vd-app .vd-kanban-run-button { display: inline-flex; align-items: center; justify-content: center; margin-left: auto; padding: 4px; border: 0; border-radius: 4px; background: transparent; color: #3fb950; flex-shrink: 0; }
+.vd-app .vd-kanban-run-button.is-running { color: #d29922; }
+.vd-kanban-run-button + .vd-kanban-menu-button { margin-left: 0; }
+.vd-kanban-run-button:hover { background: var(--vd-raised); }
+.vd-kanban-status-menu { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid var(--vd-border); }
+.vd-app .vd-kanban-status-menu button { padding: 5px 7px; border: 0; border-radius: 4px; background: var(--vd-bg); color: var(--vd-muted); text-align: left; font-size: 11px; }
+.vd-work-duration { font-variant-numeric: tabular-nums; }
+.vd-detail > .vd-work-duration { margin-bottom: 16px; color: var(--vd-muted); font-size: 12px; }
+.vd-slot.vd-slot-actual { border: 1px solid var(--vd-state); border-left-width: 3px; background: color-mix(in srgb, var(--vd-state) 22%, var(--vd-bg)); }
+.vd-slot-actual.is-running { border-bottom-width: 2px; }

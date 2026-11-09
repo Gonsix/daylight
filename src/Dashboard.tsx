@@ -6,6 +6,7 @@ import { TimeSelection } from './TimeSelection';
 import { openEditEventModal, openEventModal } from './EventModal';
 import { rangeDateTimes } from './event';
 import { openTaskModal, openProjectModal } from './CreateModal';
+import { workDuration } from './execution';
 import { openDeleteNoteModal } from './DeleteNoteModal';
 import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
@@ -56,7 +57,7 @@ function ItemRow({ item, store, onSelect, past = false, finished = false }: { it
   </div>;
 }
 function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DashboardStore; onSelect: (path: string) => void; projectPath: string }) {
-  const slots = useMemo(() => timeline(items, day), [items, day]);
+  const slots = useMemo(() => timeline(items, day, now), [items, day, now]);
   const firstHour = 0;
   const lastHour = 24;
   const start = firstHour * 60, total = (lastHour - firstHour) * 60;
@@ -92,15 +93,15 @@ function Timeline({ items, day, now, store, onSelect, projectPath }: { items: It
         {Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i).map(hour =>
           <div className="vd-hour" key={hour} style={{ top: (hour - firstHour) * 60 }}><time>{String(hour).padStart(2, '0')}:00</time><span /></div>)}
         <TimeSelection key={day} day={day} scroller={scroller} onConfirm={range => openEventModal(store,range,projectPath)}>
-          {slots.map(slot => <article key={slot.item.path} className={`vd-slot vd-slot-${slot.item.kind}`} style={{
-            ...stateColor(slot.item), top: slot.start - start, height: Math.min(total - (slot.start - start), Math.max(26, slot.end - slot.start)),
+          {slots.map(slot => <article key={`${slot.item.path}:${slot.source}`} className={`vd-slot vd-slot-${slot.item.kind}${slot.source === 'actual' ? ' vd-slot-actual' : ''}${slot.running ? ' is-running' : ''}`} style={{
+            ...stateColor(slot.item), top: slot.start - start, height: Math.min(total - (slot.start - start), Math.max(slot.source === 'actual' ? 2 : 26, slot.end - slot.start)),
             left: `${slot.column * 100 / slot.columns}%`, width: `calc(${100 / slot.columns}% - 5px)`,
-          }} title={`${slot.item.title} · ${timeLabel(slot.item.start!)}–${timeLabel(slot.item.end!)}${slot.item.projectLabel ? ' · ' + slot.item.projectLabel : ''}`} onClick={e => {
+          }} title={`${slot.item.title} · ${slot.source === 'actual' ? '実績' : '予定'} ${timeLabel(slot.from)}–${slot.running ? '実行中' : timeLabel(slot.to)}${slot.item.projectLabel ? ' · ' + slot.item.projectLabel : ''}`} onClick={e => {
             if (!(e.target as Element).closest('button,select,input,textarea')) onSelect(slot.item.path);
           }}>
             <button className="vd-slot-main" onClick={() => onSelect(slot.item.path)}>
               <span className="vd-slot-heading"><Icon name={slot.item.kind} size={13} /><strong>{slot.item.title}</strong></span>
-              {slot.end - slot.start >= 42 && <time>{timeLabel(slot.item.start!)}–{timeLabel(slot.item.end!)}</time>}
+              {slot.end - slot.start >= 42 && <time>{slot.source === 'actual' ? '実績 ' : ''}{timeLabel(slot.from)}–{slot.running ? '実行中' : timeLabel(slot.to)}</time>}
               {slot.end - slot.start >= 76 && slot.item.projectLabel && <span className="vd-slot-project">{slot.item.projectLabel}</span>}
             </button>
             {slot.end - slot.start >= 104 && <StatusSelect item={slot.item} store={store} />}
@@ -142,6 +143,7 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
       {item.due !== null && <><dt>締切</dt><dd>{dayKey(item.due)} {timeLabel(item.due)}</dd></>}
     </dl>
     </>}
+    {workDuration(item) && <p className="vd-work-duration">作業時間 {workDuration(item)}</p>}
     <h3>メモ</h3>
     {notes && <div className="vd-notes">{notes}</div>}
     <form onKeyDownCapture={e=>submitOnCommandEnter(e,memoSaving.current)} onSubmit={async e => {
@@ -160,7 +162,9 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
 export function Dashboard({ store, initialDate = null }: { store: DashboardStore; initialDate?: string | null }) {
   const revision = useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
   const items = useMemo(() => store.items(), [store, revision]);
-  const [now, setNow] = useState(Date.now()); const [chosenDay, setDay] = useState<string | null>(initialDate);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { setNow(Date.now()); }, [revision]);
+  const [chosenDay, setDay] = useState<string | null>(initialDate);
   const day = chosenDay ?? dayKey(now);
   const kanban = store.kanbanEnabled;
   const [tab, setTab] = useState<TaskTab>('day'); const [project, setProject] = useState<string | null>(null);

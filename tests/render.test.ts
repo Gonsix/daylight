@@ -62,3 +62,14 @@ test('kanban is controlled only by settings, hides hold/cancelled columns, and p
   assert.equal(day.length,6); assert.equal(new Set(day.map((i:Item)=>i.path)).size,6); assert.ok(!day.some((i:Item)=>i.kind==='event'));
   assert.equal(modules[1].kanbanTasks(rows,'2026-11-08','ongoing').length,1);
 });
+
+test('kanban exposes play/stop and only completed work has an HH:mm duration',async()=>{
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const module={exports:{} as any},require=createRequire(path.join(process.cwd(),'package.json'));
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{}}:require(id),console,Intl,Date});
+  const base:Item={path:'notes/T.md',title:'開始前',kind:'task',status:'todo',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'研究',archived:false};
+  const items=[base,{...base,path:'notes/R.md',title:'実行中',status:'on_going',taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:null}, {...base,path:'notes/D.md',title:'作業済み',status:'done',taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:dateTime('2026-11-09T10:25:59')}];
+  const html=renderToStaticMarkup(React.createElement(module.exports.Kanban,{items,store:{},onSelect:()=>{}}));
+  assert.ok(html.includes('開始前の作業を開始'));assert.ok(html.includes('実行中の作業を終了'));assert.ok(!html.includes('作業済みの作業を開始'));
+  assert.equal((html.match(/作業時間/g)||[]).length,1);assert.ok(html.includes('作業時間 01:25'));assert.ok(!html.includes('経過時間'));
+});

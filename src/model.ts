@@ -12,6 +12,7 @@ export interface Item {
   start: number | null; end: number | null; due: number | null;
   projectPath: string | null; projectLabel: string; archived: boolean;
   completedAt?: number | null;
+  taskStart?: number | null; taskEnd?: number | null;
 }
 export const isStatus = (value: string): value is Status => Object.hasOwn(STATUS, value);
 export const isActive = (item: Item) => !['done', 'cancelled'].includes(item.status);
@@ -74,32 +75,46 @@ export function titleFor(name: string, kind: Kind): string {
   return kind === 'project' ? name : name.replace(/ (?:\d{4}-\d{2}-\d{2}|TBD)(?: \d+)?$/, '');
 }
 export const hasSchedule = (item: Item) => item.start !== null && item.end !== null && item.end > item.start;
-export interface Slot { item: Item; start: number; end: number; column: number; columns: number; }
+export interface Slot { item: Item; start: number; end: number; column: number; columns: number; source: 'schedule' | 'actual'; from: number; to: number; running: boolean; }
 /** Minutes in the selected Tokyo day. Connected overlaps share a lane count. */
-export function timeline(items: Item[], day: string): Slot[] {
+export function timeline(items: Item[], day: string, now = Date.now()): Slot[] {
   const start = dayStart(day), end = start + DAY;
-  const slots: Slot[] = items.filter(i => i.kind !== 'project' && hasSchedule(i) && i.start! < end && i.end! > start)
-    .map(item => ({ item, start: Math.max(0, (item.start! - start) / 60000),
-      end: Math.min(1440, (item.end! - start) / 60000), column: 0, columns: 1 }))
-    .sort((a, b) => a.start - b.start || b.end - a.end || a.item.path.localeCompare(b.item.path));
+  const slots: Slot[] = items.flatMap(item => {
+    if (item.kind === 'project') return [];
+    const ranges: {source:'schedule'|'actual';from:number;to:number;running:boolean}[] = [];
+    if (hasSchedule(item)) ranges.push({source:'schedule',from:item.start!,to:item.end!,running:false});
+    if (item.kind === 'task' && item.taskStart != null) {
+      const running = item.status === 'on_going' && item.taskEnd == null;
+      const to = item.taskEnd ?? (running ? now : null);
+      if (to !== null && to >= item.taskStart) ranges.push({source:'actual',from:item.taskStart,to,running});
+    }
+    return ranges.filter(r => r.from < end && (r.to > start || (r.running && r.to === start))).map(range => ({
+      item,...range,start:Math.max(0,(range.from-start)/60000),end:Math.min(1440,(range.to-start)/60000),column:0,columns:1,
+    }));
+  }).sort((a,b) => a.start-b.start || b.end-a.end || a.item.path.localeCompare(b.item.path));
   let group: Slot[] = [], laneEnds: number[] = [], groupEnd = -1;
   const finish = () => { for (const slot of group) slot.columns = laneEnds.length; group = []; laneEnds = []; };
   for (const slot of slots) {
     if (slot.start >= groupEnd) { finish(); groupEnd = -1; }
     let lane = laneEnds.findIndex(e => e <= slot.start);
     if (lane < 0) lane = laneEnds.length;
-    const displayEnd = Math.min(1440, Math.max(slot.end, slot.start + 26));
+    const displayEnd = Math.min(1440, Math.max(slot.end, slot.start + (slot.source === 'actual' ? 2 : 26)));
     laneEnds[lane] = displayEnd; slot.column = lane; group.push(slot);
     groupEnd = Math.max(groupEnd, displayEnd);
   }
   finish(); return slots;
+}
+function hasWorkOnDay(item: Item, day: string): boolean {
+  if (item.taskStart == null) return false;
+  const end = item.taskEnd ?? (item.status === 'on_going' ? Date.now() : item.taskStart);
+  return dayKey(item.taskStart) === day || (item.taskStart < dayStart(day) + DAY && end > dayStart(day));
 }
 export type TaskTab = 'day' | 'ongoing' | 'unscheduled' | 'all';
 export function filterTasks(items: Item[], day: string, tab: TaskTab): Item[] {
   return items.filter(i => i.kind === 'task' && (
     tab === 'all' || (tab === 'ongoing' && i.status === 'on_going') ||
     (tab === 'unscheduled' && !i.targetDate && !hasSchedule(i)) ||
-    (tab === 'day' && (i.targetDate === day || (hasSchedule(i) && i.start! < dayStart(day) + DAY && i.end! > dayStart(day))))
+    (tab === 'day' && (i.targetDate === day || hasWorkOnDay(i,day) || (hasSchedule(i) && i.start! < dayStart(day) + DAY && i.end! > dayStart(day))))
   )).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.title.localeCompare(b.title, 'ja'));
 }
 

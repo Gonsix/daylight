@@ -1,7 +1,8 @@
 import { App, Plugin, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { EventInput, EventSnapshot, KEEP_PROJECT, eventDocument, renderEvent, updateEventDocument, validateEvent } from './event';
-import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesText, recordTaskCompletion, timeLabel, titleFor } from './model';
+import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesText, localTimestamp, timeLabel, titleFor } from './model';
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
+import { recordWorkStatus } from './execution';
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
 
 export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; content: string }
@@ -51,7 +52,7 @@ export class DashboardStore {
         projectPath: linked?.path ?? null,
         projectLabel: target?.[2] || linked?.basename || target?.[1] || project,
         archived: fm.archived === true,
-        completedAt:dateTime(fm['completed at']),
+        completedAt:dateTime(fm['completed at']), taskStart:dateTime(fm.task_start), taskEnd:dateTime(fm.task_end),
       }];
     });
     return this.cache;
@@ -74,9 +75,40 @@ export class DashboardStore {
         if (String(fm.status ?? '').trim() !== item.status) throw new Error('状態が更新されています。再度選択してください。');
         const previous=fm.status;
         fm.status = status;
-        if(item.kind==='task')recordTaskCompletion(fm,previous);
+        if(item.kind==='task')recordWorkStatus(fm,previous);
       });
       this.overrides.set(item.path, { status, previous: item.status }); this.invalidate();
+    });
+  }
+  async startTask(item: Item) {
+    if (item.kind !== 'task' || item.status === 'done' || item.status === 'cancelled') throw new Error('開始できるタスクを選び直してください。');
+    await this.queue(item.path, async () => {
+      const file=this.file(item.path);
+      await this.app.vault.process(file, content => {
+        const yaml={parse:parseYaml,stringify:stringifyYaml};
+        const {fm,body,newline}=taskDocument(content,yaml);
+        if (fm.status !== item.status || dateTime(fm.task_start) !== (item.taskStart ?? null) || dateTime(fm.task_end) !== (item.taskEnd ?? null)) throw new Error('タスクが更新されています。開き直してください。');
+        if (fm.status === 'on_going' && dateTime(fm.task_start) !== null && !fm.task_end) throw new Error('すでに開始しています。');
+        const now=Date.now();
+        // A task uses one start/end pair. Resuming retains its original start.
+        if (dateTime(fm.task_start) === null) fm.task_start=localTimestamp(now);
+        if (dateTime(fm.task_start)! > now) throw new Error('作業開始が現在より後になっています。');
+        fm.task_end=null;fm.status='on_going';fm['completed at']=null;
+        return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
+      });
+      this.invalidate();
+    });
+  }
+  async finishTask(item: Item) {
+    if (item.kind !== 'task' || item.status !== 'on_going' || item.taskStart == null || item.taskEnd != null) throw new Error('実行中のタスクを選び直してください。');
+    await this.queue(item.path, async () => {
+      await this.app.vault.process(this.file(item.path), content => {
+        const {fm,body,newline}=taskDocument(content,{parse:parseYaml,stringify:stringifyYaml});
+        if (fm.status !== 'on_going' || dateTime(fm.task_start) !== item.taskStart || dateTime(fm.task_end) !== null) throw new Error('タスクが更新されています。開き直してください。');
+        fm.status='done';recordWorkStatus(fm,'on_going');
+        return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
+      });
+      this.invalidate();
     });
   }
   async memo(path: string, text: string) {

@@ -1,13 +1,14 @@
-import { dateTime, dayKey, isStatus, recordTaskCompletion, timeLabel, validDay } from './model';
+import { dateTime, dayKey, isStatus, timeLabel, validDay } from './model';
+import { recordWorkStatus } from './execution';
 import { YamlAdapter } from './event';
 
 export interface TaskSnapshot { path: string; properties: Record<string, unknown>; types: Record<string,string>; }
 export type PropertyChanges = Record<string, unknown>;
-export const TASK_FIELDS = ['status','completed at','target_date','schedule_start','schedule_end','due','project','parent_task'];
+export const TASK_FIELDS = ['status','completed at','target_date','schedule_start','schedule_end','task_start','task_end','due','project','parent_task'];
 export const PROPERTY_LABELS: Record<string,string> = {
   status:'状態',target_date:'予定日',schedule_start:'開始',schedule_end:'終了',due:'締切',project:'プロジェクト',parent_task:'親タスク',
   tags:'タグ',aliases:'別名','created at':'作成日','last updated':'更新日時',
-  'completed at':'完了日時',
+  'completed at':'完了日時', task_start:'作業開始', task_end:'作業終了',
 };
 export function taskDocument(content: string, yaml: YamlAdapter) {
   const match=content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -32,7 +33,7 @@ export function propertyType(key:string,value:unknown,declared=''):string {
   if(typeof value==='boolean')return 'boolean';
   if(typeof value==='number')return 'number';
   let type=declared;
-  if(['schedule_start','schedule_end','due','last updated','completed at'].includes(key))type='datetime';
+  if(['schedule_start','schedule_end','task_start','task_end','due','last updated','completed at'].includes(key))type='datetime';
   if(key==='target_date')type='date';
   if(key==='created at')type=typeof value==='string'&&value.includes('T')?'datetime':'date';
   if(['tags','aliases'].includes(key)||['tags','aliases','multitext'].includes(type))return 'list';
@@ -57,7 +58,7 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
     if(next.target_date===null||next.target_date==='')next.target_date=null;
     else if(typeof next.target_date!=='string'||!validDay(next.target_date))throw new Error('予定日を確認してください。');
   }
-  for(const key of ['schedule_start','schedule_end','due','completed at'])if(keys.includes(key)) {
+  for(const key of ['schedule_start','schedule_end','task_start','task_end','due','completed at'])if(keys.includes(key)) {
     if(next[key]===null||next[key]==='')next[key]=null;
     else {
       const time=dateTime(next[key]);if(time===null)throw new Error(`${PROPERTY_LABELS[key]}は日付と時刻を指定してください。`);
@@ -69,7 +70,11 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
     const start=dateTime(next.schedule_start),end=dateTime(next.schedule_end);
     if(start!==null&&end!==null&&end<=start)throw new Error('終了日時は開始日時より後にしてください。');
   }
-  if(keys.includes('status'))recordTaskCompletion(next,fm.status);
+  if (keys.some(k => ['task_start','task_end'].includes(k))) {
+    const start=dateTime(next.task_start),end=dateTime(next.task_end);
+    if(end!==null&&(start===null||end<start))throw new Error('作業終了は作業開始以降の日時にしてください。');
+  }
+  if(keys.includes('status'))recordWorkStatus(next,fm.status);
   const header=yaml.stringify(next).trimEnd().replace(/\r?\n/g,newline);
   const result=`---${newline}${header}${newline}---${newline}${body}`;
   // Keep the task identity valid even when the tag list itself is edited.
