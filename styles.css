@@ -276,3 +276,5 @@
 .vd-child-title { display: block; flex: 1; min-width: 0; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
 .vd-parent-picker { display: flex; flex-direction: column; gap: 5px; color: var(--vd-muted); font-size: 11px; }
 .vd-parent-picker select { width: 100%; min-width: 0; }
+
+.vd-child-status.is-done { width: 16px; height: 16px; border: 0; }

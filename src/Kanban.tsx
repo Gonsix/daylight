@@ -7,6 +7,10 @@ import { carryovers, completedTasks, dayKey, filterTasks, isStatus, Item, localT
 
 const kanbanColor = (status:string) => status === 'todo' ? '#3fb950' : status === 'on_going' ? '#d29922' : status === 'done' ? '#a371f7' : isStatus(status) ? STATUS[status].color : '#94a3b8';
 
+function CompletedIcon() {
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" strokeWidth="2" /><path d="m8 12 3 3 6-6" strokeWidth="2.8" /></svg>;
+}
+
 export function kanbanTasks(items: Item[], day: string, tab: TaskTab): Item[] {
   const rows = filterTasks(items,day,tab);
   if (tab === 'day') rows.push(...carryovers(items,day).filter(i => i.kind === 'task'),...completedTasks(items,day));
@@ -79,7 +83,7 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
             onDragStart={e => { if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-vault-dashboard-task',item.path); }}
             onDragEnd={() => { dragged.current=null;setOver('');setParentOver(''); }}>
             {parentOver === item.path && <span className="vd-parent-drop-hint">このタスクの子にする</span>}
-            <div className="vd-kanban-card-head"><span className={`vd-kanban-card-state${item.status === 'done' ? ' is-done' : ''}`} aria-hidden="true">{item.status === 'done' && <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" strokeWidth="2" /><path d="m8 12 3 3 6-6" strokeWidth="2.8" /></svg>}</span><span className="vd-kanban-project">{item.projectLabel || 'タスク'}</span>{!['done','cancelled'].includes(item.status) && <button className={`vd-kanban-run-button${isTaskRunning(item) ? ' is-running' : ''}`} type="button" disabled={!!busy} aria-label={`${item.title}の作業を${isTaskRunning(item) ? '終了' : '開始'}`} title={isTaskRunning(item) ? '作業を終了して完了' : '作業を開始'} onClick={() => void execute(item)}>
+            <div className="vd-kanban-card-head"><span className={`vd-kanban-card-state${item.status === 'done' ? ' is-done' : ''}`} aria-hidden="true">{item.status === 'done' && <CompletedIcon />}</span><span className="vd-kanban-project">{item.projectLabel || 'タスク'}</span>{!['done','cancelled'].includes(item.status) && <button className={`vd-kanban-run-button${isTaskRunning(item) ? ' is-running' : ''}`} type="button" disabled={!!busy} aria-label={`${item.title}の作業を${isTaskRunning(item) ? '終了' : '開始'}`} title={isTaskRunning(item) ? '作業を終了して完了' : '作業を開始'} onClick={() => void execute(item)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{isTaskRunning(item) ? <rect x="6" y="6" width="12" height="12" rx="2"/> : <path d="M7 4.8a1 1 0 0 1 1.5-.86l12 7.2a1 1 0 0 1 0 1.72l-12 7.2A1 1 0 0 1 7 19.2Z"/>}</svg>
             </button>}<button className="vd-kanban-menu-button" type="button" aria-label={`${item.title}の操作`} aria-expanded={menu === item.path} onClick={() => setMenu(menu === item.path ? null : item.path)}>⋯</button></div>
             <button className="vd-kanban-title" onClick={() => onSelect(item.path)}>{item.title}</button>
@@ -94,7 +98,7 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
             {!!children.get(item.path)?.length && <div className="vd-child-tasks">
               <button type="button" className="vd-child-toggle" aria-expanded={!collapsed.has(item.path)} onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(item.path))next.delete(item.path);else next.add(item.path);return next;})}>サブタスク {children.get(item.path)!.filter(child=>child.status==='done').length}/{children.get(item.path)!.length}<span aria-hidden="true">{collapsed.has(item.path) ? '›' : '⌄'}</span></button>
               {!collapsed.has(item.path) && children.get(item.path)!.map(child=><button key={child.path} type="button" className={`vd-child-row${parentOver === child.path ? ' is-parent-target' : ''}`} title={`${child.title} · ${isStatus(child.status) ? STATUS[child.status].label : child.status || '未設定'}`} onClick={()=>onSelect(child.path)} onDragOver={e=>parentDragOver(e,child)} onDrop={e=>parentDrop(e,child)}>
-                <span className="vd-child-status" style={{'--vd-child-state':kanbanColor(child.status)} as CSSProperties} aria-label={isStatus(child.status) ? STATUS[child.status].label : '状態未設定'}>{child.status==='done'?'✓':''}</span><span className="vd-child-title">{child.title}</span>
+                <span className={`vd-child-status${child.status === 'done' ? ' is-done' : ''}`} style={{'--vd-child-state':kanbanColor(child.status)} as CSSProperties} aria-label={isStatus(child.status) ? STATUS[child.status].label : '状態未設定'}>{child.status === 'done' && <CompletedIcon />}</span><span className="vd-child-title">{child.title}</span>
               </button>)}
             </div>}
             {menu === item.path && <div className="vd-kanban-status-menu" role="group" aria-label={`${item.title}の操作`}>
