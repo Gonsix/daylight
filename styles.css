@@ -272,7 +272,7 @@
 .vd-app .vd-child-toggle { display: flex; align-items: center; width: 100%; padding: 3px 0 7px; color: var(--vd-muted); background: transparent; border: 0; text-align: left; font-size: 11px; }
 .vd-child-toggle > span { margin-left: auto; }
 .vd-app .vd-child-row { display: flex; align-items: center; justify-content: flex-start; gap: 7px; width: 100%; padding: 5px 0 5px 16px; background: transparent; border: 0; color: var(--vd-muted); text-align: left; }
-.vd-child-status { flex-shrink: 0; display: grid; place-items: center; width: 12px; height: 12px; border: 1.5px solid var(--vd-child-state); border-radius: 50%; color: var(--vd-child-state); font-size: 8px; line-height: 1; }
+.vd-child-status { flex: 0 0 16px; display: grid; place-items: center; width: 16px; height: 16px; border: 1.5px solid var(--vd-child-state); border-radius: 50%; color: var(--vd-child-state); font-size: 8px; line-height: 1; }
 .vd-child-title { display: block; flex: 1; min-width: 0; text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; }
 .vd-parent-picker { display: flex; flex-direction: column; gap: 5px; color: var(--vd-muted); font-size: 11px; }
 .vd-parent-picker select { width: 100%; min-width: 0; }
