@@ -197,6 +197,11 @@ export class DashboardStore {
       raw=typeof fm.parent_task === 'string' ? fm.parent_task : '';context=file.path;
     }
   }
+  async setTaskProject(item: Item, projectPath: string) {
+    if (item.kind !== 'task') throw new Error('タスクを選択してください。');
+    const snapshot = await this.loadTask(item.path);
+    await this.updateTask(snapshot, { project: projectPath ? `[[${projectPath.replace(/\.md$/, '')}]]` : null });
+  }
   async setParentTask(item: Item, parentPath: string) {
     if (item.kind !== 'task') throw new Error('タスクを選択してください。');
     const snapshot=await this.loadTask(item.path);

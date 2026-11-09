@@ -388,3 +388,16 @@ test('parent validation checks file content even if metadata cache has not caugh
   bodies.set(parent.path,`---\n${JSON.stringify({tags:['task'],status:'todo',parent_task:`[[${task.path.replace(/\.md$/,'')}]]`})}\n---\n\n## Notes\n`);
   await assert.rejects(()=>store.setParentTask(store.items().find((i:any)=>i.path===task.path),parent.path),/循環/);
 });
+
+test('project changes from the card menu update only project and allow clearing it',async()=>{
+  const {store,task,project,fm,bodies}=await fixture();
+  const row=()=>store.items().find((i:any)=>i.path===task.path);
+  await store.startTask(row());const before={...fm.get(task.path)},body=bodies.get(task.path)!.split('\n---\n')[1];
+  await store.setTaskProject(row(),'');assert.equal(fm.get(task.path).project,null);
+  await store.setTaskProject(row(),project.path);assert.equal(fm.get(task.path).project,'[[notes/P]]');
+  for(const key of ['status','task_start','task_end','target_date','schedule_start','schedule_end','parent_task','custom'])assert.equal(fm.get(task.path)[key],before[key],key);
+  assert.equal(bodies.get(task.path)!.split('\n---\n')[1],body);
+  await assert.rejects(()=>store.setTaskProject(row(),task.path),/プロジェクト/);
+  await assert.rejects(()=>store.setTaskProject(row(),'notes/deleted.md'),/プロジェクト/);
+  assert.equal(fm.get(task.path).project,'[[notes/P]]');
+});

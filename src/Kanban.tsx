@@ -36,6 +36,13 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
     catch(e) { new Notice((e as Error).message); }
     finally { saving.current=false;setBusy(null); }
   };
+  const assignProject = async (item: Item, projectPath: string) => {
+    if (saving.current) return;
+    saving.current=true;setBusy(item.path);
+    try { await store.setTaskProject(item,projectPath);setMenu(null); }
+    catch(e) { new Notice((e as Error).message); }
+    finally { saving.current=false;setBusy(null); }
+  };
   const assignParent = async (item: Item, parentPath: string) => {
     if (saving.current) return;
     saving.current=true;setBusy(item.path);
@@ -91,6 +98,11 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
               </button>)}
             </div>}
             {menu === item.path && <div className="vd-kanban-status-menu" role="group" aria-label={`${item.title}の操作`}>
+              <label className="vd-parent-picker"><span>プロジェクト</span><select aria-label={`${item.title}のプロジェクト`} value={item.projectPath || ''} disabled={!!busy} onChange={e=>void assignProject(item,e.target.value)}>
+                <option value="">未設定</option>
+                {item.projectPath && !allItems.some(p=>p.kind==='project' && p.path===item.projectPath) && <option value={item.projectPath}>{item.projectLabel || item.projectPath}</option>}
+                {allItems.filter(p=>p.kind==='project' && (!p.archived || p.path===item.projectPath)).map(p=><option key={p.path} value={p.path}>{p.title}</option>)}
+              </select></label>
               <label className="vd-parent-picker"><span>親タスク</span><select aria-label={`${item.title}の親タスク`} value={item.parentTaskPath || ''} disabled={!!busy} onChange={e=>void assignParent(item,e.target.value)}>
                 <option value="">親なし</option>
                 {item.parentTaskPath && !allItems.some(p=>p.path===item.parentTaskPath) && <option value={item.parentTaskPath}>{item.parentTaskLabel || item.parentTaskPath}</option>}
