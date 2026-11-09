@@ -85,10 +85,10 @@ test('parent card shows only direct children while child cards stay in their own
   vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{}}:require(id),console,Intl,Date});
   const base:Item={path:'notes/P.md',title:'親タスク',kind:'task',status:'todo',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
   const child={...base,path:'notes/C.md',title:'進行中の子',status:'on_going',parentTaskPath:base.path};
-  const hidden={...base,path:'notes/H.md',title:'範囲外の子',status:'on_hold',parentTaskPath:base.path};
+  const hidden={...base,path:'notes/H.md',title:'範囲外の子',status:'done',parentTaskPath:base.path};
   const grandchild={...base,path:'notes/G.md',title:'孫タスク',parentTaskPath:child.path};
   const html=renderToStaticMarkup(React.createElement(module.exports.Kanban,{items:[base,child],allItems:[base,child,hidden,grandchild],store:{},onSelect:()=>{}}));
-  assert.ok(html.includes('子タスク 2'));assert.ok(html.includes('子タスク 1'));assert.ok(html.includes('範囲外の子'));assert.ok(html.includes('aria-label="保留"'));
+  assert.ok(html.includes('サブタスク 1/2'));assert.ok(html.includes('サブタスク 0/1'));assert.ok(html.includes('範囲外の子'));assert.ok(html.includes('aria-label="完了"'));
   assert.equal((html.match(/class="vd-kanban-card"/g)||[]).length,2);
   assert.equal((html.match(/>進行中の子<\//g)||[]).length,2);
   assert.ok(html.includes('vd-child-row'));assert.ok(!html.includes('aria-label="保留のタスク"'));
