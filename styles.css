@@ -104,7 +104,7 @@
 .vd-project-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 13px; }
 .vd-timeline-scroll { flex: 1 1 0; min-height: 0; height: 0; overflow: auto; padding: 14px 12px 4px 0; scrollbar-gutter: stable; }
 .vd-timeline { position: relative; }
-.vd-hour { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.vd-hour { position: absolute; left: 0; right: 0; height: 0; display: flex; align-items: flex-start; gap: 10px; pointer-events: none; }
 .vd-hour time { width: 49px; flex-shrink: 0; text-align: right; color: var(--vd-muted); font-size: 10px; line-height: 1; font-variant-numeric: tabular-nums; transform: translateY(-50%); }
 .vd-hour > span { flex: 1; height: 1px; background: color-mix(in srgb, var(--vd-border) 70%, transparent); }
 .vd-events { position: absolute; top: 0; left: 63px; right: 0; }
