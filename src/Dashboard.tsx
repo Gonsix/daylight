@@ -204,7 +204,7 @@ export function Dashboard({ store, initialDate = null }: { store: DashboardStore
             {([['day', '選択日'], ['ongoing', '進行中'], ['unscheduled', '予定日未定'], ['all', 'すべて']] as const).map(([id, label]) =>
               <button role="tab" aria-selected={tab === id} className={tab === id ? 'is-active' : ''} key={id} onClick={() => setTab(id)}>{id === 'day' && day === dayKey(now) ? '今日' : label}</button>)}
           </div>
-          <>{kanban ? <Kanban items={boardTasks} allItems={items} store={store} onSelect={select} /> : <>
+          <>{kanban ? <Kanban items={boardTasks} allItems={items} store={store} onSelect={select} onAddTask={status=>openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '',status)} /> : <>
           <div className="vd-task-list">{tasks.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} />)}{!tasks.length && <p className="vd-empty">タスクなし</p>}</div>
           {tab === 'day' && past.length > 0 && <div className="vd-carryover"><div className="vd-subhead"><h3>持ち越し</h3><span>{past.length}</span></div>
             {past.map(i => <ItemRow key={i.path} item={i} store={store} onSelect={select} past />)}

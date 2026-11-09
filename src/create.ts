@@ -1,4 +1,5 @@
-import { appendMemo, dateTime, dayKey, isStatus, recordTaskCompletion, timeLabel, validDay } from './model';
+import { appendMemo, dateTime, dayKey, isStatus, timeLabel, validDay } from './model';
+import { recordWorkStatus } from './execution';
 import { YamlAdapter } from './event';
 
 export interface TaskInput {
@@ -49,7 +50,7 @@ export function renderCreatedNote(template: string, kind: 'task' | 'project', pr
     .filter((t: unknown): t is string => typeof t === 'string');
   fm.tags = [...new Set([...tags.filter((t: string) => !['task','project','event'].includes(t.replace(/^#/,''))), kind])];
   Object.assign(fm, properties, { 'created at': day });
-  if (kind === 'task') recordTaskCompletion(fm, 'todo');
+  if (kind === 'task') recordWorkStatus(fm, 'todo');
   let body = expanded.slice(match[0].length);
   if (goal.trim()) {
     if (!/^## ゴール\s*$/m.test(body)) throw new Error('Projectテンプレートのゴール見出しが見つかりません。');

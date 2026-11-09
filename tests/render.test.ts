@@ -104,3 +104,15 @@ test('phone board stacks status columns while iPad and desktop keep the horizont
   Platform.isPhone=false;Platform.isTablet=true;assert.ok(!render().includes('vd-kanban-phone'));
   Platform.isTablet=false;assert.ok(!render().includes('vd-kanban-phone'));
 });
+
+test('each status column provides an add action and the composer uses its initial status',async()=>{
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx'),path.resolve('src/CreateModal.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const require=createRequire(path.join(process.cwd(),'package.json'));
+  const modules=result.outputFiles.map(out=>{const module={exports:{} as any};vm.runInNewContext(out.text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});return module.exports;});
+  const html=renderToStaticMarkup(React.createElement(modules[0].Kanban,{items:[],store:{},onSelect:()=>{},onAddTask:()=>{}}));
+  for(const label of ['未着手','進行中','完了'])assert.ok(html.includes(`aria-label="${label}にタスクを追加"`));
+  for(const initialStatus of ['todo','on_going','done','on_hold','cancelled']) {
+    const form=renderToStaticMarkup(React.createElement(modules[1].CreateForm,{store:{items:()=>[]},kind:'task',day:'2026-11-09',initialStatus,close:()=>{}}));
+    assert.ok(form.includes(`value="${initialStatus}" selected=""`));assert.ok(form.includes('value="2026-11-09"'));
+  }
+});

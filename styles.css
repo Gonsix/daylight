@@ -283,3 +283,10 @@
 /* Stack status columns on phones; tablets retain the horizontal board. */
 .vd-kanban.vd-kanban-phone { flex-direction: column; overflow-x: visible; min-height: 0; }
 .vd-kanban-phone > .vd-kanban-column { flex: 0 0 auto; width: 100%; min-width: 0; }
+
+.vd-kanban-add-zone { display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 6px; }
+.vd-app .vd-kanban-add { width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--vd-muted); opacity: 0; pointer-events: none; }
+.vd-kanban-add-zone:hover .vd-kanban-add, .vd-kanban-add-zone:focus-within .vd-kanban-add { opacity: 1; pointer-events: auto; }
+.vd-app .vd-kanban-add:hover { background: var(--vd-raised); color: var(--vd-text); }
+@media (hover: none), (pointer: coarse) { .vd-app .vd-kanban-add { opacity: 1; pointer-events: auto; } }
+.vd-kanban-phone .vd-kanban-add { opacity: 1; pointer-events: auto; }

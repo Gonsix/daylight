@@ -3,13 +3,13 @@ import { createRoot, Root } from 'react-dom/client';
 import { Modal, Notice } from 'obsidian';
 import { DashboardStore } from './store';
 import { ProjectInput, TaskInput, projectValues, taskValues } from './create';
-import { isActive, STATUS } from './model';
+import { isActive, STATUS, Status } from './model';
 import { submitOnCommandEnter } from './shortcuts';
 
-export function CreateForm({ store, kind, day = '', projectPath = '', close }: {
-  store: DashboardStore; kind: 'task' | 'project'; day?: string; projectPath?: string; close: () => void;
+export function CreateForm({ store, kind, day = '', projectPath = '', initialStatus = 'todo', close }: {
+  store: DashboardStore; kind: 'task' | 'project'; day?: string; projectPath?: string; initialStatus?: Status; close: () => void;
 }) {
-  const [task, setTask] = useState<TaskInput>({ title: '', status: 'todo', targetDate: day, start: '', end: '', due: '', projectPath, parentPath: '', memo: '' });
+  const [task, setTask] = useState<TaskInput>({ title: '', status: initialStatus, targetDate: day, start: '', end: '', due: '', projectPath, parentPath: '', memo: '' });
   const [project, setProject] = useState<ProjectInput>({ title: '', status: 'todo', parentPath: '', workingFolder: '', goal: '', memo: '' });
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const saving = useRef(false);
@@ -67,14 +67,14 @@ export function CreateForm({ store, kind, day = '', projectPath = '', close }: {
 }
 class CreateModal extends Modal {
   private root: Root | null = null;
-  constructor(private store: DashboardStore, private kind: 'task' | 'project', private day = '', private projectPath = '') { super(store.app); }
+  constructor(private store: DashboardStore, private kind: 'task' | 'project', private day = '', private projectPath = '', private initialStatus: Status = 'todo') { super(store.app); }
   onOpen() {
     this.setTitle(this.kind === 'task' ? 'タスクを追加' : 'プロジェクトを追加');
     this.modalEl.addClass('vd-event-modal');
     this.root = createRoot(this.contentEl);
-    this.root.render(<CreateForm store={this.store} kind={this.kind} day={this.day} projectPath={this.projectPath} close={() => this.close()} />);
+    this.root.render(<CreateForm store={this.store} kind={this.kind} day={this.day} projectPath={this.projectPath} initialStatus={this.initialStatus} close={() => this.close()} />);
   }
   onClose() { this.root?.unmount(); this.root = null; this.contentEl.empty(); }
 }
-export function openTaskModal(store: DashboardStore, day: string, projectPath = '') { new CreateModal(store,'task',day,projectPath).open(); }
+export function openTaskModal(store: DashboardStore, day: string, projectPath = '', initialStatus: Status = 'todo') { new CreateModal(store,'task',day,projectPath,initialStatus).open(); }
 export function openProjectModal(store: DashboardStore) { new CreateModal(store,'project').open(); }

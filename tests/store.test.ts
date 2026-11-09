@@ -401,3 +401,10 @@ test('project changes from the card menu update only project and allow clearing 
   await assert.rejects(()=>store.setTaskProject(row(),'notes/deleted.md'),/プロジェクト/);
   assert.equal(fm.get(task.path).project,'[[notes/P]]');
 });
+
+test('creating in an ongoing column initializes the same actual start as starting a task',async()=>{
+  const {store,fm}=await fixture();
+  const file=await store.createTask({...taskInput,status:'on_going'});
+  const props=fm.get(file.path);assert.equal(props.status,'on_going');assert.ok(props.task_start);assert.equal(props.task_end,null);assert.equal(props.schedule_start,null);
+  const done=await store.createTask({...taskInput,status:'done'});assert.ok(fm.get(done.path).task_end);assert.ok(fm.get(done.path)['completed at']);
+});

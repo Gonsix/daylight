@@ -16,7 +16,7 @@ export function kanbanTasks(items: Item[], day: string, tab: TaskTab): Item[] {
   if (tab === 'day') rows.push(...carryovers(items,day).filter(i => i.kind === 'task'),...completedTasks(items,day));
   return [...new Map(rows.map(i => [i.path,i])).values()];
 }
-export function Kanban({ items, allItems = items, store, onSelect }: { items: Item[]; allItems?: Item[]; store: DashboardStore; onSelect: (path: string) => void }) {
+export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: { items: Item[]; allItems?: Item[]; store: DashboardStore; onSelect: (path: string) => void; onAddTask?: (status: Status) => void }) {
   const [showOther,setShowOther] = useState(false), [over,setOver] = useState(''), [busy,setBusy] = useState<string | null>(null);
   const [menu,setMenu] = useState<string | null>(null), [query,setQuery] = useState('');
   const dragged = useRef<Item | null>(null), saving = useRef(false);
@@ -120,6 +120,7 @@ export function Kanban({ items, allItems = items, store, onSelect }: { items: It
 
           </article>)}
           {!rows.length && <p className="vd-kanban-empty">タスクなし</p>}
+          {onAddTask && isStatus(status) && <div className="vd-kanban-add-zone"><button type="button" className="vd-kanban-add" aria-label={`${label}にタスクを追加`} onClick={()=>onAddTask(status)}>＋ 追加</button></div>}
         </section>;
       })}
     </div>
