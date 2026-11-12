@@ -428,3 +428,16 @@ test('custom root routes reading, creating and date-based renaming to the config
   const outsider=new File('notes/TaskOutside.md');files.push(outsider);fm.set(outsider.path,{tags:['task'],status:'todo'});store.invalidate();
   assert.ok(!store.items().some((i:any)=>i.path===outsider.path));
 });
+test('filtered reordering uses hidden tasks and assigns existing tasks on first use', async () => {
+  const {store,task,files,fm}=await fixture();
+  const hidden=new File('Daylight/Tasks/Hidden.md'), moved=new File('Daylight/Tasks/Moved.md');
+  files.push(hidden,moved);fm.set(hidden.path,{tags:['task'],status:'todo',sort_order:20000});fm.set(moved.path,{tags:['task'],status:'todo',sort_order:30000});fm.get(task.path).sort_order=10000;store.invalidate();
+  await store.reorderTask(store.items().find((i:any)=>i.path===moved.path),task.path,'after');
+  assert.equal(fm.get(moved.path).sort_order,15000);assert.equal(fm.get(hidden.path).sort_order,20000);
+});
+test('status changes place tasks at the end of the destination column', async () => {
+  const {store,task,files,fm}=await fixture();const other=new File('Daylight/Tasks/Doing.md');
+  files.push(other);fm.set(other.path,{tags:['task'],status:'on_hold',sort_order:12345});store.sortOrderGap=1000;store.invalidate();
+  await store.setStatus(store.items().find((i:any)=>i.path===task.path),'on_hold');
+  assert.equal(fm.get(task.path).sort_order,13345);
+});

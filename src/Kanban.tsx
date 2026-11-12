@@ -3,6 +3,7 @@ import { Notice, Platform } from 'obsidian';
 import { childTasks, canParent } from './hierarchy';
 import { isTaskRunning, workDuration } from './execution';
 import { DaylightStore } from './store';
+import { orderedTasks } from './order';
 import { carryovers, completedTasks, dayKey, filterTasks, isStatus, Item, localTimestamp, STATUS, Status, TaskTab, timeLabel } from './model';
 
 const kanbanColor = (status:string) => status === 'todo' ? '#3fb950' : status === 'on_going' ? '#d29922' : status === 'done' ? '#a371f7' : isStatus(status) ? STATUS[status].color : '#94a3b8';
@@ -21,6 +22,8 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
   const [menu,setMenu] = useState<string | null>(null), [query,setQuery] = useState('');
   const dragged = useRef<Item | null>(null), saving = useRef(false);
   const [parentOver,setParentOver] = useState('');
+  const [orderOver,setOrderOver] = useState<{path:string;side:'before'|'after'} | null>(null);
+  const [draggedCard,setDraggedCard] = useState<{path:string;height:number} | null>(null);
   const [collapsed,setCollapsed] = useState<Set<string>>(() => new Set());
   const children=useMemo(()=>childTasks(allItems),[allItems]);
   const visibleItems = items.filter(i => `${i.title} ${i.projectLabel}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
@@ -56,6 +59,13 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
   };
   const parentDragOver = (e: React.DragEvent, target: Item) => {
     if (!dragged.current) return;
+    const rect=e.currentTarget.getBoundingClientRect(), fraction=(e.clientY-rect.top)/rect.height;
+    if (dragged.current.status !== target.status && (fraction < 0.25 || fraction > 0.75)) { setParentOver(''); setOrderOver(null); return; }
+    if (target.path !== dragged.current.path && (fraction < 0.25 || fraction > 0.75)) {
+      e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';setParentOver('');setOver('');
+      setOrderOver({path:target.path,side:fraction < 0.25 ? 'before' : 'after'});return;
+    }
+    setOrderOver(null);
     e.stopPropagation();setOver('');
     if (!saving.current && canParent(allItems,dragged.current.path,target.path)) {
       e.preventDefault();e.dataTransfer.dropEffect='link';setParentOver(target.path);
@@ -63,25 +73,34 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
   };
   const parentDrop = (e: React.DragEvent, target: Item) => {
     e.preventDefault();e.stopPropagation();
-    const child=dragged.current;dragged.current=null;setParentOver('');setOver('');
-    if(child && canParent(allItems,child.path,target.path)) void assignParent(child,target.path);
+    const child=dragged.current;dragged.current=null;setDraggedCard(null);setParentOver('');setOver('');
+    const placement=orderOver;setOrderOver(null);
+    if (child && placement?.path === target.path && child.status === target.status) {
+      if (saving.current) return;
+      saving.current=true;setBusy(child.path);
+      const shown=orderedTasks(visibleItems.filter(i=>i.status===target.status && i.path!==child.path));
+      const next=placement.side === 'after' ? shown[shown.findIndex(i=>i.path===target.path)+1] : undefined;
+      void store.reorderTask(child,next?.path ?? target.path,next ? 'before' : placement.side).catch(e=>new Notice((e as Error).message)).finally(()=>{saving.current=false;setBusy(null);});
+    } else if(child && canParent(allItems,child.path,target.path)) void assignParent(child,target.path);
   };
   return <div className="daylight-kanban-wrap">
     <div className="daylight-kanban-tools"><label className="daylight-kanban-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" aria-label="カンバン内のタスクを検索" placeholder="タスク名・プロジェクトで検索" value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" aria-expanded={showOther} onClick={() => setShowOther(v => !v)}>{showOther ? '保留・中止を隠す' : '保留・中止を表示'}{otherCount > 0 ? ` (${otherCount})` : ''}</button></div>
     <div className={`daylight-kanban${Platform?.isPhone ? ' daylight-kanban-phone' : ''}`} aria-label="タスクのカンバン" tabIndex={0}>
       {columns.map(status => {
-        const rows = visibleItems.filter(i => status === 'unknown' ? !isStatus(i.status) : i.status === status);
+        const rows = orderedTasks(visibleItems.filter(i => status === 'unknown' ? !isStatus(i.status) : i.status === status));
         const label = isStatus(status) ? STATUS[status].label : '状態未設定';
         const color = kanbanColor(status);
         return <section key={status} className={`daylight-kanban-column${over === status ? ' is-over' : ''}`} aria-label={`${label}のタスク`}
           style={{'--daylight-state':color} as CSSProperties}
-          onDragOver={e => { if (dragged.current && isStatus(status) && !saving.current) { e.preventDefault(); e.dataTransfer.dropEffect='move'; setOver(status); } }}
-          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(''); }}
-          onDrop={e => { e.preventDefault(); const item=dragged.current; dragged.current=null; setOver(''); if (item && isStatus(status)) void move(item,status); }}>
+          onDragOver={e => { if (dragged.current && isStatus(status) && !saving.current) { e.preventDefault(); e.dataTransfer.dropEffect='move'; setOrderOver(null);setParentOver('');setOver(status); } }}
+          onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { setOver('');setOrderOver(null);setParentOver(''); } }}
+          onDrop={e => { e.preventDefault(); const item=dragged.current; dragged.current=null; setDraggedCard(null);setOrderOver(null);setParentOver('');setOver(''); if (item && isStatus(status)) void move(item,status); }}>
           <h3>{label}<span>{rows.length}</span></h3>
-          {rows.map(item => <article key={item.path} className={`daylight-kanban-card${parentOver === item.path ? ' is-parent-target' : ''}`} onDragOver={e=>parentDragOver(e,item)} onDrop={e=>parentDrop(e,item)} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setParentOver('');}} draggable={!busy} aria-busy={busy === item.path}
-            onDragStart={e => { if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-daylight-task',item.path); }}
-            onDragEnd={() => { dragged.current=null;setOver('');setParentOver(''); }}>
+          {rows.map(item => <React.Fragment key={item.path}>
+            <div className={`daylight-kanban-insertion${orderOver?.path === item.path && orderOver.side === 'before' ? ' is-active' : ''}`} style={{'--daylight-insertion-height': `${draggedCard?.height ?? 0}px`} as CSSProperties} aria-hidden="true" onDragOver={e=>{if(orderOver?.path === item.path && orderOver.side==='before'){e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';}}} onDrop={e=>parentDrop(e,item)}><span>ここに移動</span></div>
+            <article className={`daylight-kanban-card${parentOver === item.path ? ' is-parent-target' : ''}${draggedCard?.path === item.path ? ' is-dragging' : ''}`} onDragOver={e=>parentDragOver(e,item)} onDrop={e=>{if(dragged.current?.status !== item.status && parentOver !== item.path){setParentOver('');setOrderOver(null);return;} parentDrop(e,item);}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setParentOver('');}} draggable={!busy} aria-busy={busy === item.path}
+            onDragStart={e => { if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; setDraggedCard({path:item.path,height:e.currentTarget.getBoundingClientRect().height}); e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-daylight-task',item.path); }}
+            onDragEnd={() => { dragged.current=null;setDraggedCard(null);setOver('');setParentOver('');setOrderOver(null); }}>
             {parentOver === item.path && <span className="daylight-parent-drop-hint">このタスクの子にする</span>}
             <div className="daylight-kanban-card-head"><span className={`daylight-kanban-card-state${item.status === 'done' ? ' is-done' : ''}`} aria-hidden="true">{item.status === 'done' && <CompletedIcon />}</span><span className="daylight-kanban-project">{item.projectLabel || 'タスク'}</span>{!['done','cancelled'].includes(item.status) && <button className={`daylight-kanban-run-button${isTaskRunning(item) ? ' is-running' : ''}`} type="button" disabled={!!busy} aria-label={`${item.title}の作業を${isTaskRunning(item) ? '終了' : '開始'}`} title={isTaskRunning(item) ? '作業を終了して完了' : '作業を開始'} onClick={() => void execute(item)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{isTaskRunning(item) ? <rect x="6" y="6" width="12" height="12" rx="2"/> : <path d="M7 4.8a1 1 0 0 1 1.5-.86l12 7.2a1 1 0 0 1 0 1.72l-12 7.2A1 1 0 0 1 7 19.2Z"/>}</svg>
@@ -118,7 +137,9 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
               </select></label>
             </div>}
 
-          </article>)}
+          </article>
+          <div className={`daylight-kanban-insertion${orderOver?.path === item.path && orderOver.side === 'after' ? ' is-active' : ''}`} style={{'--daylight-insertion-height': `${draggedCard?.height ?? 0}px`} as CSSProperties} aria-hidden="true" onDragOver={e=>{if(orderOver?.path === item.path && orderOver.side==='after'){e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';}}} onDrop={e=>parentDrop(e,item)}><span>ここに移動</span></div>
+          </React.Fragment>)}
           {!rows.length && <p className="daylight-kanban-empty">タスクなし</p>}
           {onAddTask && isStatus(status) && <div className="daylight-kanban-add-zone"><button type="button" className="daylight-kanban-add" aria-label={`${label}にタスクを追加`} onClick={()=>onAddTask(status)}>＋ 追加</button></div>}
         </section>;

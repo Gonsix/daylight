@@ -272,3 +272,10 @@
 
 .daylight-app .daylight-schedule-warning { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; padding: 10px 16px; border: 0; background: transparent; color: var(--daylight-muted); text-align: left; font-size: 12px; }
 .daylight-schedule-warning svg { flex-shrink: 0; }
+
+/* Keep a real drop target under the pointer as the gap opens. */
+.daylight-app .daylight-kanban-card.is-dragging { opacity: .35; }
+.daylight-app .daylight-kanban-insertion { height: 0; overflow: hidden; pointer-events: none; transition: height 160ms ease, margin-bottom 160ms ease; }
+.daylight-app .daylight-kanban-insertion.is-active { height: var(--daylight-insertion-height); margin-bottom: 9px; pointer-events: auto; }
+.daylight-app .daylight-kanban-insertion > span { display: flex; align-items: center; justify-content: center; height: 100%; border: 1px dashed var(--daylight-state); border-radius: 6px; color: var(--daylight-muted); background: color-mix(in srgb, var(--daylight-state) 7%, var(--daylight-bg)); font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .daylight-app .daylight-kanban-insertion { transition: none; } }

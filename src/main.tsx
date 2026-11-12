@@ -8,8 +8,8 @@ import { DAYLIGHT_ICON, DAYLIGHT_ICON_SVG } from './icon';
 import { DEFAULT_ROOT, storageRoot } from './storage';
 
 const VIEW_TYPE = 'daylight';
-interface DaylightSettings { openOnStartup: boolean; rootFolder: string }
-const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, rootFolder: DEFAULT_ROOT };
+interface DaylightSettings { openOnStartup: boolean; rootFolder: string; sortOrderGap: number }
+const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, rootFolder: DEFAULT_ROOT, sortOrderGap: 10000 };
 
 class DaylightSettingTab extends PluginSettingTab {
   constructor(private dashboard: DaylightPlugin) { super(dashboard.app, dashboard); }
@@ -24,6 +24,18 @@ class DaylightSettingTab extends PluginSettingTab {
         try {await this.dashboard.changeRootFolder(root);new Notice('Daylightフォルダの配置場所を保存しました。');this.display();}
         catch(error) {new Notice((error as Error).message);}
         finally {button.setDisabled(false);}
+      }));
+    let gap = String(this.dashboard.settings.sortOrderGap);
+    new Setting(this.containerEl).setName('ソートオーダーの間隔')
+      .setDesc('新規タスクや状態を変更したタスクを末尾に追加するときの間隔です。1以上の整数を指定してください。既存の順序は変更しません。')
+      .addText(text => text.setValue(gap).onChange(value => { gap = value; }))
+      .addButton(button => button.setButtonText('保存').onClick(async () => {
+        const value = Number(gap);
+        if (!/^\d+$/.test(gap.trim()) || !Number.isSafeInteger(value) || value < 1) { new Notice('間隔には1以上の整数を入力してください。'); return; }
+        const previous = this.dashboard.settings.sortOrderGap;
+        this.dashboard.settings.sortOrderGap = value;
+        try { await this.dashboard.saveSettings(); new Notice('ソートオーダーの間隔を保存しました。'); }
+        catch { this.dashboard.settings.sortOrderGap = previous; new Notice('設定を保存できませんでした。'); }
       }));
     for (const [key, name, desc] of [
       ['openOnStartup', '起動時にDaylightを開く', 'Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。'],
@@ -75,10 +87,11 @@ export default class DaylightPlugin extends Plugin {
   async onload() {
     addIcon(DAYLIGHT_ICON, DAYLIGHT_ICON_SVG);
     const saved = await this.loadData();
-    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT };
+    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT, sortOrderGap: Number.isSafeInteger(saved?.sortOrderGap) && saved.sortOrderGap > 0 ? saved.sortOrderGap : 10000 };
     if (saved && Object.hasOwn(saved,'enableKanban')) await this.saveData(this.settings);
     this.addSettingTab(new DaylightSettingTab(this));
     this.store = new DaylightStore(this.app, this, this.settings.rootFolder);
+    this.store.sortOrderGap = this.settings.sortOrderGap;
     this.registerView(VIEW_TYPE, leaf => new DaylightView(leaf, this.store));
     const open = async () => {
       const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -129,6 +142,7 @@ export default class DaylightPlugin extends Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+    this.store.sortOrderGap = this.settings.sortOrderGap;
     this.store.invalidate();
   }
   async changeRootFolder(value: string) {

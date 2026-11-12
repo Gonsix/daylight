@@ -8,7 +8,7 @@ export const STATUS = {
 export type Status = keyof typeof STATUS;
 export type Kind = 'task' | 'event' | 'project';
 export interface Item {
-  path: string; title: string; kind: Kind; status: string; targetDate: string;
+  path: string; title: string; kind: Kind; status: string; targetDate: string; sortOrder?: number | null;
   start: number | null; end: number | null; due: number | null;
   projectPath: string | null; projectLabel: string; archived: boolean;
   parentTaskPath?: string | null; parentTaskLabel?: string;
