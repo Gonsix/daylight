@@ -178,6 +178,31 @@ sort_order: 10000
 
 ソースは`src/`、配布ファイルは`main.js`・`manifest.json`・`styles.css`です。
 
+### Vault外で開発してビルド・インストール
+
+Node.jsとnpm、Bash（macOS・Linux・WindowsのGit Bashなど）が必要です。リポジトリはVault外の任意の開発用フォルダにクローンできます。
+
+```sh
+git clone https://github.com/Gonsix/daylight.git
+cd daylight
+./install.sh "/path/to/My Vault"
+```
+
+この1コマンドで、初回は依存関係を `npm ci --include=dev` でインストールしてからビルドし、指定したVaultの `.obsidian/plugins/daylight/` へ `main.js`・`manifest.json`・`styles.css` の3ファイルを配置します。Vaultには事前にObsidianで開いた際の `.obsidian` フォルダが必要です。スペースを含むパスは引用符で囲んでください。
+
+コード変更後も同じコマンドで更新できます。`data.json` などの既存設定、タスク・予定・プロジェクトのノートは変更しません。ソース・`node_modules` はコピーしません。ビルドが失敗した場合は配置しません。依存関係の変更を取り込んだときは `npm ci --include=dev` を再実行してください。
+
+毎回パスを指定したくない場合は、開発用シェルで環境変数を設定できます。
+
+```sh
+export DAYLIGHT_VAULT_PATH="$HOME/path/to/My Vault"
+./install.sh
+```
+
+`npm run build:install -- "/path/to/My Vault"` でも実行できます。配置後はObsidianのコミュニティプラグイン設定でDaylightを有効にしてください。既に有効な場合はオフ→オンで再読み込みします。このコマンドはObsidianの有効化設定を変更しません。
+
+### チェックとビルド
+
 ```sh
 npm ci
 npm run check
