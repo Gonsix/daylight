@@ -1,7 +1,7 @@
 {
   "id": "daylight",
   "name": "Daylight",
-  "version": "0.3.0",
+  "version": "0.3.3",
   "minAppVersion": "1.8.7",
   "description": "Daily timeline, tasks and projects with inline status and notes.",
   "author": "Gonsix",
