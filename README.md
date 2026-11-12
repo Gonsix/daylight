@@ -1,6 +1,18 @@
 # Daylight
 
+A daily timeline, Kanban tasks, and projects for Obsidian. Your data stays in Markdown notes in your vault.
+
 React製のObsidianプラグイン。予定と時間指定タスクを縦のタイムラインに表示し、タスク・プロジェクトの確認、状態変更、メモ追記を行えます。HearthやBasesに依存せず動作します。
+
+## インストール
+
+現在はGitHub Releasesから手動でインストールできます。Obsidianのコミュニティプラグイン一覧への登録は準備中です。
+
+1. [最新リリース](https://github.com/Gonsix/daylight/releases/latest)から `main.js`・`manifest.json`・`styles.css` をダウンロードします。
+2. Vault内に `.obsidian/plugins/daylight/` を作成し、3ファイルをその直下に配置します。
+3. Obsidianを再起動し、「設定 → コミュニティプラグイン」でDaylightを有効にします。
+
+デスクトップ・モバイルに対応しています。日時は現在Asia/Tokyo固定、UIは日本語です。タスクを削除すると元のノートがゴミ箱へ移動するため、導入前にVaultのバックアップをおすすめします。
 
 ## 保存先と初期セットアップ
 
@@ -24,8 +36,6 @@ Daylight/
 ## 開く
 
 Obsidian再起動後、コマンドパレットの **Daylight: Daylightを開く**、または左リボンのカレンダー時計アイコンから開きます。
-
-Hearthにはプラグインビューを使う **Daylight** ボードを追加しています。以前の **ホーム** ボードは維持しています。
 
 ## 起動時のホーム画面
 
@@ -162,7 +172,7 @@ sort_order: 10000
 - 未送信のメモは同じ画面内で項目を切り替えても残ります。ビューを閉じる・アプリを終了すると失われるため、必要な内容は「追加」で保存してください。
 - ノート削除・名前変更・外部編集はイベント経由で反映します。競合する状態変更は上書きせずエラーを表示します。
 
-既存項目のドラッグ移動とGoogleカレンダー同期はこの版には含みません。
+タイムライン上の既存予定のドラッグによる日時変更と、Googleカレンダー同期はこの版には含みません。
 
 ## 開発
 
