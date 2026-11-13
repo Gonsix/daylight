@@ -198,8 +198,8 @@ test('language setting updates visible settings and rolls back on save failure',
   assert.equal(i18n.getLanguage(),'ja');
 });
 
-test('Chinese and Korean settings persist and update the language selector', async () => {
-  for (const [language, label] of [['zh-CN', '语言'], ['ko', '언어']] as const) {
+test('all translated settings persist and update the language selector', async () => {
+  for (const [language, label] of [['zh-CN', '语言'], ['ko', '언어'], ['zh-TW', '語言'], ['es', 'Idioma'], ['de', 'Sprache'], ['fr', 'Langue'], ['pt-BR', 'Idioma']] as const) {
     const {plugin, registrations} = await loadPlugin();
     registrations.settingsTab.containerEl = {empty:()=>{}};
     registrations.settingsTab.display();

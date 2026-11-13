@@ -3,6 +3,11 @@ import en from './locales/en.json';
 import ja from './locales/ja.json';
 import zhCN from './locales/zh-CN.json';
 import ko from './locales/ko.json';
+import zhTW from './locales/zh-TW.json';
+import es from './locales/es.json';
+import de from './locales/de.json';
+import fr from './locales/fr.json';
+import ptBR from './locales/pt-BR.json';
 
 /** UI languages only. Note content, paths, and storage keys are never translated. */
 export const LANGUAGE_INFO = {
@@ -10,6 +15,11 @@ export const LANGUAGE_INFO = {
   ja: { name: '日本語', locale: 'ja-JP' },
   'zh-CN': { name: '简体中文', locale: 'zh-CN' },
   ko: { name: '한국어', locale: 'ko-KR' },
+  'zh-TW': { name: '繁體中文', locale: 'zh-TW' },
+  es: { name: 'Español', locale: 'es-ES' },
+  de: { name: 'Deutsch', locale: 'de-DE' },
+  fr: { name: 'Français', locale: 'fr-FR' },
+  'pt-BR': { name: 'Português (Brasil)', locale: 'pt-BR' },
 } as const;
 export type Language = keyof typeof LANGUAGE_INFO;
 export const LANGUAGES = Object.keys(LANGUAGE_INFO) as Language[];
@@ -21,7 +31,7 @@ export function parseLanguage(value: unknown): Language {
 
 /** Japanese source messages are stable identities, including numbered placeholders. */
 export type MessageKey = keyof typeof ja;
-const messages: Record<Language, Record<MessageKey, string>> = { en, ja, 'zh-CN': zhCN, ko };
+const messages: Record<Language, Record<MessageKey, string>> = { en, ja, 'zh-CN': zhCN, ko, 'zh-TW': zhTW, es, de, fr, 'pt-BR': ptBR };
 let currentLanguage: Language = DEFAULT_LANGUAGE;
 const listeners = new Set<() => void>();
 export const getLanguage = () => currentLanguage;

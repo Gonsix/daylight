@@ -1,6 +1,6 @@
 # Daylightの起動時の動作
 
-この文書は、Daylight 0.3.9の現在の実装における、Obsidian起動時の動作をまとめたものです。主な実装は `src/main.tsx`、`src/store.ts`、`src/Daylight.tsx` にあります。
+この文書は、Daylight 0.4.0の現在の実装における、Obsidian起動時の動作をまとめたものです。主な実装は `src/main.tsx`、`src/store.ts`、`src/Daylight.tsx` にあります。
 
 ## 起動から画面表示まで
 

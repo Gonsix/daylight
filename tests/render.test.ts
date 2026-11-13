@@ -183,7 +183,7 @@ test('English dashboard and composers translate fixed labels and Japanese can be
     const html = renderToStaticMarkup(nodes[0]);
     assert.ok(html.includes('Timeline'));
     assert.ok(html.includes(i18n.t('未着手')));
-    for (const language of ['zh-CN', 'ko'] as const) {
+    for (const language of ['zh-CN', 'ko', 'zh-TW', 'es', 'de', 'fr', 'pt-BR'] as const) {
       store.language = language;
       i18n.setLanguage(language);
       for (const node of nodes) {
@@ -192,9 +192,10 @@ test('English dashboard and composers translate fixed labels and Japanese can be
         assert.doesNotMatch(translated, /[ぁ-んァ-ン]/, language);
       }
       const translated = renderToStaticMarkup(nodes[0]);
-      assert.ok(translated.includes(language === 'ko' ? '타임라인' : '时间线'));
-      assert.ok(translated.includes(language === 'ko' ? '시작 전' : '未开始'));
-      assert.ok(renderToStaticMarkup(nodes[4]).includes(language === 'ko' ? '휴지통' : '回收站'));
+      const expected = { 'zh-CN':['时间线','未开始','回收站'], ko:['타임라인','시작 전','휴지통'], 'zh-TW':['時間軸','尚未開始','垃圾桶'], es:['Cronología','Pendiente','papelera'], de:['Zeitleiste','Offen','Papierkorb'], fr:['Chronologie','À faire','corbeille'], 'pt-BR':['Linha do tempo','A fazer','lixeira'] }[language];
+      assert.ok(translated.includes(expected[0]), language);
+      assert.ok(translated.includes(expected[1]), language);
+      assert.ok(renderToStaticMarkup(nodes[4]).includes(expected[2]), language);
     }
     i18n.setLanguage('ja');
     assert.ok(renderToStaticMarkup(nodes[1]).includes('予定日（空欄で未定）'));

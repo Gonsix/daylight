@@ -18,13 +18,18 @@ import en from '../src/locales/en.json';
 import ja from '../src/locales/ja.json';
 import zhCN from '../src/locales/zh-CN.json';
 import ko from '../src/locales/ko.json';
-import { setLanguage, t, subscribeLanguage, LANGUAGES, locale } from '../src/i18n';
+import zhTW from '../src/locales/zh-TW.json';
+import es from '../src/locales/es.json';
+import de from '../src/locales/de.json';
+import fr from '../src/locales/fr.json';
+import ptBR from '../src/locales/pt-BR.json';
+import { setLanguage, t, subscribeLanguage, LANGUAGES, LANGUAGE_INFO, locale } from '../src/i18n';
 import { STATUS } from '../src/model';
 import { PROPERTY_LABELS } from '../src/task';
 import { renderCreatedNote } from '../src/create';
 
 test('dictionaries have matching keys and interpolation parameters', () => {
-  for (const dictionary of [en, zhCN, ko]) {
+  for (const dictionary of [en, zhCN, ko, zhTW, es, de, fr, ptBR]) {
     assert.deepEqual(Object.keys(dictionary).sort(), Object.keys(ja).sort());
     for (const key of Object.keys(ja) as (keyof typeof ja)[]) {
       assert.deepEqual(dictionary[key].match(/\{\d+\}/g)?.sort() ?? [], ja[key].match(/\{\d+\}/g)?.sort() ?? [], key);
@@ -80,5 +85,27 @@ test('Chinese and Korean use their dictionaries, locales, and interpolated value
     assert.equal(translate('ko', 'loading'), '불러오는 중…');
     assert.equal(t('{0}年{1}月{2}日{3}', 2026, 11, 13, ''), '2026년 11월 13일');
     assert.doesNotThrow(() => new Intl.DateTimeFormat(locale(), {weekday:'short'}).format(new Date()));
+  } finally { setLanguage('en'); }
+});
+
+
+test('all registered languages select the correct catalog and date locale', () => {
+  const expected = {
+    en: ['Language', 'Todo'], ja: ['言語', '未着手'],
+    'zh-CN': ['语言', '未开始'], ko: ['언어', '시작 전'],
+    'zh-TW': ['語言', '尚未開始'], es: ['Idioma', 'Pendiente'],
+    de: ['Sprache', 'Offen'], fr: ['Langue', 'À faire'], 'pt-BR': ['Idioma', 'A fazer'],
+  };
+  assert.deepEqual([...LANGUAGES].sort(), Object.keys(expected).sort());
+  try {
+    for (const language of LANGUAGES) {
+      assert.equal(parseLanguage(language), language);
+      setLanguage(language);
+      assert.equal(t('言語'), expected[language][0]);
+      assert.equal(STATUS.todo.label, expected[language][1]);
+      assert.equal(locale(), LANGUAGE_INFO[language].locale);
+      assert.equal(new Intl.DateTimeFormat(locale()).resolvedOptions().locale, LANGUAGE_INFO[language].locale);
+      assert.ok(t('「{0}」のノートをゴミ箱に移します。', '日本語 {0}').includes('日本語 {0}'));
+    }
   } finally { setLanguage('en'); }
 });
