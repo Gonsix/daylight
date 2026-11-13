@@ -3,7 +3,11 @@
 .theme-light .daylight-host { background: #f6f7f9; }
 /* Fill a standalone/hosted pane; note embeds retain their content height. */
 .daylight-host:not(.daylight-embed) { display: flex; flex-direction: column; }
-.daylight-host:not(.daylight-embed) > .daylight-app { flex: 1 0 auto; }
+.daylight-host:not(.daylight-embed) > :is(.daylight-app, .daylight-prepared) { flex: 1 0 auto; }
+.daylight-prepared { position: relative; min-width: 0; }
+.daylight-pending { visibility: hidden; }
+.daylight-loading-overlay { position: absolute; inset: 0; display: flex; }
+.daylight-loading-overlay > .daylight-app { flex: 1; }
 .daylight-app.daylight-is-loading { display: flex; align-items: center; justify-content: center; }
 .daylight-embed > .daylight-app.daylight-is-loading { min-height: 240px; }
 .daylight-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--daylight-muted); font-size: 13px; text-align: center; }

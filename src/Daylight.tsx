@@ -150,18 +150,37 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
 
 const alwaysReady = () => true;
 
+function Loading() {
+  return <div className="daylight-app daylight-is-loading" role="status" aria-live="polite" aria-busy="true">
+    <div className="daylight-loading"><span className="daylight-loading-spinner" aria-hidden="true" /><span>読み込み中…</span></div>
+  </div>;
+}
+
 export function Daylight({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
   const readySnapshot = store.isReady ?? alwaysReady;
   const ready = useSyncExternalStore(store.subscribe, readySnapshot, readySnapshot);
-  if (!ready) {
-    return <div className="daylight-app daylight-is-loading" role="status" aria-live="polite" aria-busy="true">
-      <div className="daylight-loading">
-        <span className="daylight-loading-spinner" aria-hidden="true" />
-        <span>読み込み中…</span>
-      </div>
-    </div>;
-  }
-  return <DaylightDashboard store={store} initialDate={initialDate} />;
+  if (!ready) return <Loading />;
+  return <PreparedDashboard store={store} initialDate={initialDate} />;
+}
+
+function PreparedDashboard({ store, initialDate }: { store: DaylightStore; initialDate: string | null }) {
+  const [visible, setVisible] = useState(false);
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const win = host.current?.ownerDocument.defaultView;
+    if (!win) { setVisible(true); return; }
+    let second = 0;
+    const first = win.requestAnimationFrame(() => {
+      second = win.requestAnimationFrame(() => setVisible(true));
+    });
+    return () => { win.cancelAnimationFrame(first); if (second) win.cancelAnimationFrame(second); };
+  }, []);
+  return <div className="daylight-prepared" ref={host}>
+    <div className={visible ? '' : 'daylight-pending'} aria-hidden={!visible} inert={!visible}>
+      <DaylightDashboard store={store} initialDate={initialDate} />
+    </div>
+    {!visible && <div className="daylight-loading-overlay"><Loading /></div>}
+  </div>;
 }
 
 function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {

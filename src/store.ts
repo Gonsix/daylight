@@ -54,6 +54,24 @@ export class DaylightStore {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   snapshot = () => this.revision;
   isReady = () => this.ready;
+  async prepareStartup(): Promise<void> {
+    const files = this.app.vault.getMarkdownFiles().filter(file => this.storage.kind(file.path) !== null);
+    if (files.every(file => this.app.metadataCache.getFileCache(file) != null)) return;
+    // Some files may never have a cache (for example, an empty note), so do not
+    // leave the dashboard blocked indefinitely if no further event arrives.
+    await new Promise<void>(resolve => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        this.app.metadataCache.offref(event);
+        resolve();
+      };
+      const event = this.app.metadataCache.on('resolved', finish);
+      const timer = setTimeout(finish, 3000);
+    });
+  }
   markReady() {
     if (this.ready) return;
     this.ready = true;

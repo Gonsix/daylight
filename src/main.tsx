@@ -128,6 +128,7 @@ export default class DaylightPlugin extends Plugin {
         console.error('Daylight: フォルダの初期化に失敗しました。', error);
         if (active) new Notice('Daylightフォルダを準備できませんでした。設定の配置場所と書き込み権限を確認してください。');
       }
+      if (active) await this.store.prepareStartup();
       if (active && this.settings.openOnStartup) {
         await open().catch(error => {
           console.error('Daylight: 起動時の表示に失敗しました。', error);

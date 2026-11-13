@@ -24,10 +24,10 @@ async function loadPlugin(saved: any = null, existing: any[] = [], storageError?
   const storageFiles=new Map<string,any>();
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,setTimeout,clearTimeout,
     require:(id:string)=>id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
   const plugin=new module.exports.default();
-  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{if(!layoutReady)throw new Error('Vault not ready');if(storageError)throw storageError;storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=()=>{layoutReady=true;return callback();};},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
+  plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getMarkdownFiles:()=>[],getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{if(!layoutReady)throw new Error('Vault not ready');if(storageError)throw storageError;storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=()=>{layoutReady=true;return callback();};},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
   await plugin.onload();
   return { plugin, registrations, storageFiles };
 }
@@ -137,4 +137,24 @@ test('store stays in loading state until layout and storage initialization finis
   assert.equal(failing.plugin.store.isReady(), false);
   await failing.registrations.ready();
   assert.equal(failing.plugin.store.isReady(), true);
+});
+
+test('startup waits for unresolved dashboard metadata before marking the store ready', async () => {
+  const { plugin, registrations } = await loadPlugin();
+  let resolved: (() => void) | undefined;
+  let removed = false;
+  plugin.app.vault.getMarkdownFiles = () => [{ path: 'Daylight/Tasks/example.md' }];
+  plugin.app.metadataCache.getFileCache = () => null;
+  plugin.app.metadataCache.on = (name: string, callback: () => void) => {
+    assert.equal(name, 'resolved'); resolved = callback; return {};
+  };
+  plugin.app.metadataCache.offref = () => { removed = true; };
+  const startup = registrations.ready();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(plugin.store.isReady(), false);
+  assert.ok(resolved);
+  resolved();
+  await startup;
+  assert.equal(plugin.store.isReady(), true);
+  assert.equal(removed, true);
 });

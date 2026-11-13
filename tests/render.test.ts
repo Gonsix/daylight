@@ -143,6 +143,7 @@ test('Daylight renders a stable loading screen until store startup readiness com
   ready = true;
   store.items = () => [];
   const readyHtml = renderToStaticMarkup(React.createElement(module.exports.Daylight, { store, initialDate: '2026-11-06' }));
-  assert.ok(!readyHtml.includes('daylight-is-loading'));
+  assert.ok(readyHtml.includes('daylight-is-loading'));
+  assert.ok(readyHtml.includes('daylight-pending'));
   assert.ok(readyHtml.includes('タイムライン'));
 });
