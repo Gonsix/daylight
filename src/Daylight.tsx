@@ -38,7 +38,7 @@ function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
     {Object.entries(STATUS).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
   </select>;
 }
-function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string) => void; projectPath: string }) {
+function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string, event?: React.MouseEvent) => void; projectPath: string }) {
   const slots = useMemo(() => timeline(items, day, now), [items, day, now]);
   const firstHour = 0;
   const lastHour = 24;
@@ -79,9 +79,9 @@ function Timeline({ items, day, now, store, onSelect, projectPath }: { items: It
             ...stateColor(slot.item), top: slot.start - start, height: Math.min(total - (slot.start - start), Math.max(slot.source === 'actual' ? 2 : 26, slot.end - slot.start)),
             left: `${slot.column * 100 / slot.columns}%`, width: `calc(${100 / slot.columns}% - 5px)`,
           }} title={`${slot.item.title} · ${slot.source === 'actual' ? '実績' : '予定'} ${timeLabel(slot.from)}–${slot.running ? '実行中' : timeLabel(slot.to)}${slot.item.projectLabel ? ' · ' + slot.item.projectLabel : ''}`} onClick={e => {
-            if (!(e.target as Element).closest('button,select,input,textarea')) onSelect(slot.item.path);
+            if (!(e.target as Element).closest('button,select,input,textarea')) onSelect(slot.item.path, e);
           }}>
-            <button className="daylight-slot-main" onClick={() => onSelect(slot.item.path)}>
+            <button className="daylight-slot-main" onClick={e => onSelect(slot.item.path, e)}>
               <span className="daylight-slot-heading"><Icon name={slot.item.kind} size={13} /><strong>{slot.item.title}</strong></span>
               {slot.end - slot.start >= 42 && <time>{slot.source === 'actual' ? '実績 ' : ''}{timeLabel(slot.from)}–{slot.running ? '実行中' : timeLabel(slot.to)}</time>}
               {slot.end - slot.start >= 76 && slot.item.projectLabel && <span className="daylight-slot-project">{slot.item.projectLabel}</span>}
@@ -153,7 +153,8 @@ export function Daylight({ store, initialDate = null }: { store: DaylightStore; 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const root = useRef<HTMLDivElement>(null), focusReturn = useRef<HTMLElement | null>(null);
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(id); }, []);
-  const select = (path: string) => {
+  const select = (path: string, event?: React.MouseEvent) => {
+    if (event && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void store.open(path, true).catch(e => new Notice(e.message)); return; }
     if (store.items().find(i => i.path === path)?.kind === 'event') { openEditEventModal(store,path); return; }
     focusReturn.current = root.current?.ownerDocument.activeElement as HTMLElement; setSelected(path);
   };
@@ -185,13 +186,13 @@ export function Daylight({ store, initialDate = null }: { store: DaylightStore; 
           <Kanban items={boardTasks} allItems={items} store={store} onSelect={select} onAddTask={status=>openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '',status)} />
         </section>
         {invalid.length > 0 && <section className="daylight-panel daylight-unscheduled"><div className="daylight-section-head"><h2>日時の確認</h2><span className="daylight-count">{invalid.length}</span></div>
-          {invalid.map(i => <button key={i.path} className="daylight-schedule-warning" onClick={() => select(i.path)}><Icon name={i.kind} /><span>{i.title}</span></button>)}</section>}
+          {invalid.map(i => <button key={i.path} className="daylight-schedule-warning" onClick={e => select(i.path, e)}><Icon name={i.kind} /><span>{i.title}</span></button>)}</section>}
         <section className="daylight-panel daylight-projects"><div className="daylight-section-head"><h2>プロジェクト</h2><span className="daylight-count">{projects.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="プロジェクトを追加" title="プロジェクトを追加" onClick={() => openProjectModal(store)}>＋</button></div>
           <div className="daylight-project-grid">{projects.map(p => {
             const count = items.filter(i => i.kind === 'task' && i.projectPath === p.path && isActive(i)).length;
-            return <article className={`daylight-project${project === p.path ? ' is-selected' : ''}`} key={p.path}>
-              <button className="daylight-project-main" aria-pressed={project === p.path} onClick={() => setProject(project === p.path ? null : p.path)}><Icon name="project" /><strong>{p.title}</strong><span>{count}</span></button>
-              <div className="daylight-project-bottom"><StatusSelect item={p} store={store} /><button className="daylight-icon-button" aria-label={`${p.title}の詳細`} onClick={() => select(p.path)}><Icon name="open" size={14} /></button></div>
+            return <article className={`daylight-project${project === p.path ? ' is-selected' : ''}`} key={p.path} onClick={e => { if (!(e.target as Element).closest('button,select,input,textarea')) select(p.path, e); }}>
+              <button className="daylight-project-main" aria-pressed={project === p.path} onClick={e => { if (e.metaKey || e.ctrlKey) select(p.path, e); else setProject(project === p.path ? null : p.path); }}><Icon name="project" /><strong>{p.title}</strong><span>{count}</span></button>
+              <div className="daylight-project-bottom"><StatusSelect item={p} store={store} /><button className="daylight-icon-button" aria-label={`${p.title}の詳細`} onClick={e => select(p.path, e)}><Icon name="open" size={14} /></button></div>
             </article>;
           })}</div>{!projects.length && <p className="daylight-empty">プロジェクトなし</p>}
         </section>

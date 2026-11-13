@@ -116,7 +116,7 @@
 .daylight-detail { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(350px, 100%); background: var(--daylight-surface); border-left: 1px solid var(--daylight-border); box-shadow: -12px 0 40px #00000018; padding: 22px; overflow: auto; }
 .daylight-detail-actions { display: flex; align-items: center; gap: 5px; margin-bottom: 20px; }
 .daylight-detail-actions > span { flex: 1; color: var(--daylight-muted); font-size: 11px; }
-.daylight-detail h2 { font-size: 19px; font-weight: 600; line-height: 1.4; margin-bottom: 15px; overflow-wrap: anywhere; }
+.daylight-detail h2 { user-select: text; -webkit-user-select: text; font-size: 19px; font-weight: 600; line-height: 1.4; margin-bottom: 15px; overflow-wrap: anywhere; }
 .daylight-detail-meta { display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 10px; font-size: 11px; margin: 24px 0 !important; }
 .daylight-detail-meta dt { color: var(--daylight-muted); }
 .daylight-detail-meta dd { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }

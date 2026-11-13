@@ -210,7 +210,7 @@ export class DaylightStore {
       this.overrides.delete(snapshot.path); this.invalidate();
     }));
   }
-  async open(path: string) { await this.app.workspace.getLeaf('tab').openFile(this.file(path)); }
+  async open(path: string, background = false) { await this.app.workspace.getLeaf('tab').openFile(this.file(path), background ? { active: false } : undefined); }
   private projectLink(path: string): string {
     if (!path) return '';
     const project = this.items().find(i => i.kind === 'project' && i.path === path);
