@@ -102,14 +102,28 @@ export default class DaylightPlugin extends Plugin {
     this.addRibbonIcon('calendar-clock', 'Daylight', () => void open());
     this.addCommand({ id: 'open-daylight', name: 'Daylightを開く', callback: () => void open() });
     let active = true;
-    this.register(() => { active = false; });
+    let readyFrame = 0;
+    this.register(() => {
+      active = false;
+      if (readyFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(readyFrame);
+    });
+    const finishStartup = () => {
+      if (!active) return;
+      if (typeof requestAnimationFrame !== 'function') { this.store.markReady(); return; }
+      readyFrame = requestAnimationFrame(() => {
+        if (!active) return;
+        readyFrame = requestAnimationFrame(() => {
+          readyFrame = 0;
+          if (active) this.store.markReady();
+        });
+      });
+    };
     this.app.workspace.onLayoutReady(async () => {
       if (!active) return;
       // Vault files may not be available during onload. Register the view first
       // so Obsidian can restore it, then install folders once layout is ready.
       try {
         await this.store.storage.ensure();
-        if (active) this.store.invalidate();
       } catch (error) {
         console.error('Daylight: フォルダの初期化に失敗しました。', error);
         if (active) new Notice('Daylightフォルダを準備できませんでした。設定の配置場所と書き込み権限を確認してください。');
@@ -120,6 +134,7 @@ export default class DaylightPlugin extends Plugin {
           new Notice('Daylightを開けませんでした。コマンドから開き直してください。');
         });
       }
+      finishStartup();
     });
     for (const language of ['vault-dashboard', 'daylight']) this.registerMarkdownCodeBlockProcessor(language, (source, el, ctx) => {
       try {

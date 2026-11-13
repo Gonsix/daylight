@@ -148,7 +148,23 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
   </aside>;
 }
 
+const alwaysReady = () => true;
+
 export function Daylight({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
+  const readySnapshot = store.isReady ?? alwaysReady;
+  const ready = useSyncExternalStore(store.subscribe, readySnapshot, readySnapshot);
+  if (!ready) {
+    return <div className="daylight-app daylight-is-loading" role="status" aria-live="polite" aria-busy="true">
+      <div className="daylight-loading">
+        <span className="daylight-loading-spinner" aria-hidden="true" />
+        <span>読み込み中…</span>
+      </div>
+    </div>;
+  }
+  return <DaylightDashboard store={store} initialDate={initialDate} />;
+}
+
+function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
   const revision = useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
   const items = useMemo(() => store.items(), [store, revision]);
   const [now, setNow] = useState(Date.now());

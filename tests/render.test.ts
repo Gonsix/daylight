@@ -127,3 +127,22 @@ test('each status column provides an add action and the composer uses its initia
     assert.ok(form.includes(`value="${initialStatus}" selected=""`));assert.ok(form.includes('value="2026-11-09"'));
   }
 });
+
+test('Daylight renders a stable loading screen until store startup readiness completes', async () => {
+  const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['obsidian','react','react/*','react-dom/*']});
+  const module = { exports: {} as any }, require = createRequire(path.join(process.cwd(), 'package.json'));
+  vm.runInNewContext(result.outputFiles[0].text, { module, exports: module.exports, require: (id: string) => id === 'obsidian' ? { Notice: class {}, Modal: class {} } : require(id), console, Intl, Date });
+  let ready = false;
+  const store = { subscribe: () => () => {}, snapshot: () => 1, isReady: () => ready, items: (): Item[] => { throw new Error('items should not be read before ready'); } };
+  const loadingHtml = renderToStaticMarkup(React.createElement(module.exports.Daylight, { store, initialDate: '2026-11-06' }));
+  assert.ok(loadingHtml.includes('daylight-is-loading'));
+  assert.ok(loadingHtml.includes('読み込み中…'));
+  assert.ok(!loadingHtml.includes('タイムライン'));
+  assert.ok(!loadingHtml.includes('daylight-kanban'));
+
+  ready = true;
+  store.items = () => [];
+  const readyHtml = renderToStaticMarkup(React.createElement(module.exports.Daylight, { store, initialDate: '2026-11-06' }));
+  assert.ok(!readyHtml.includes('daylight-is-loading'));
+  assert.ok(readyHtml.includes('タイムライン'));
+});

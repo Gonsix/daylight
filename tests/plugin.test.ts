@@ -126,3 +126,15 @@ test('unloading before layout skips storage initialization',async()=>{
   await registrations.ready();
   assert.equal(storageFiles.size,0);
 });
+
+test('store stays in loading state until layout and storage initialization finish', async () => {
+  const { plugin, registrations } = await loadPlugin();
+  assert.equal(plugin.store.isReady(), false);
+  await registrations.ready();
+  assert.equal(plugin.store.isReady(), true);
+
+  const failing = await loadPlugin({ openOnStartup: true }, [], new Error('Storage unavailable'));
+  assert.equal(failing.plugin.store.isReady(), false);
+  await failing.registrations.ready();
+  assert.equal(failing.plugin.store.isReady(), true);
+});

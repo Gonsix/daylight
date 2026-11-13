@@ -19,22 +19,46 @@ export class DaylightStore {
   private cache: Item[] | null = null;
   private orderOverrides = new Map<string, { value: number; previous: unknown }>();
   private workOverrides = new Map<string, { sessions: WorkSession[]; taskStart: number | null; taskEnd: number | null; valueKey: string; previousKey: string }>();
+  private ready = false;
+  private notifyTimer: ReturnType<typeof setTimeout> | null = null;
   sortOrderGap = 10000;
   constructor(public app: App, plugin: Plugin, root = 'Daylight') {
     this.storage = new DaylightStorage(app,root);
-    const update = () => { this.cache = null; this.revision++; for (const fn of this.listeners) fn(); };
-    plugin.registerEvent(app.metadataCache.on('changed', update));
-    plugin.registerEvent(app.metadataCache.on('resolved', update));
-    plugin.registerEvent(app.vault.on('create', update));
-    plugin.registerEvent(app.vault.on('delete', update));
-    plugin.registerEvent(app.vault.on('rename', update));
-    plugin.registerEvent(app.vault.on('modify', update));
-    plugin.register(() => this.listeners.clear());
+    const update = () => {
+      if (this.notifyTimer !== null) { clearTimeout(this.notifyTimer); this.notifyTimer = null; }
+      this.cache = null; this.revision++;
+      for (const fn of this.listeners) fn();
+    };
+    const onExternalChange = () => {
+      this.cache = null;
+      if (!this.ready || this.notifyTimer !== null) return;
+      if (typeof setTimeout !== 'function') { update(); return; }
+      this.notifyTimer = setTimeout(() => {
+        this.notifyTimer = null;
+        update();
+      }, 16);
+    };
+    plugin.registerEvent(app.metadataCache.on('changed', onExternalChange));
+    plugin.registerEvent(app.metadataCache.on('resolved', onExternalChange));
+    plugin.registerEvent(app.vault.on('create', onExternalChange));
+    plugin.registerEvent(app.vault.on('delete', onExternalChange));
+    plugin.registerEvent(app.vault.on('rename', onExternalChange));
+    plugin.registerEvent(app.vault.on('modify', onExternalChange));
+    plugin.register(() => {
+      if (this.notifyTimer !== null) { clearTimeout(this.notifyTimer); this.notifyTimer = null; }
+      this.listeners.clear();
+    });
     this.invalidate = update;
   }
   invalidate: () => void;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   snapshot = () => this.revision;
+  isReady = () => this.ready;
+  markReady() {
+    if (this.ready) return;
+    this.ready = true;
+    this.invalidate();
+  }
   items(): Item[] {
     if (this.cache) return this.cache;
     this.cache = this.app.vault.getMarkdownFiles().filter(f => this.storage.kind(f.path) !== null).flatMap(file => {
