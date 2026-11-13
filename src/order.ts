@@ -6,7 +6,7 @@ export function orderedTasks(items: Item[]): Item[] {
     if (x != null && y != null && x !== y) return x-y;
     if (x != null && y == null) return -1;
     if (x == null && y != null) return 1;
-    return (a.start ?? Infinity)-(b.start ?? Infinity) || a.title.localeCompare(b.title,'ja') || a.path.localeCompare(b.path);
+    return (a.start ?? Infinity)-(b.start ?? Infinity) || a.title.localeCompare(b.title) || a.path.localeCompare(b.path);
   });
 }
 export function orderBetween(before: number | null, after: number | null, gap: number): number {

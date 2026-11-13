@@ -178,7 +178,7 @@ test('task sidebar updates period, due and additional typed properties while pre
   await store.updateTask(snapshot,{schedule_start:'2026-11-06T13:07',schedule_end:'2026-11-06T14:19',due:'2026-11-08T15:23',priority:0,checked:false,labels:['a','b'],config:{nested:true}});
   const data=fm.get(task.path);assert.equal(data.schedule_start,'2026-11-06T13:07:00');assert.equal(data.due,'2026-11-08T15:23:00');
   assert.equal(data.priority,0);assert.equal(data.checked,false);assert.deepEqual(data.config,{nested:true});assert.ok(bodies.get(task.path)!.includes('## 派生タスク(Child Tasks)\n- child'));
-  assert.equal(store.items().find((i:any)=>i.path===task.path).start,Date.parse('2026-11-06T13:07:00+09:00'));
+  assert.equal(store.items().find((i:any)=>i.path===task.path).start,new Date(2026,10,6,13,7,0).getTime());
 });
 test('changing target date renames a task, and clearing it produces the TBD filename',async()=>{
   const {store,task,fm,renames}=await fixture();

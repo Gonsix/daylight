@@ -7,7 +7,7 @@ export function childTasks(items: Item[]): Map<string, Item[]> {
     const rows = children.get(item.parentTaskPath) ?? [];
     rows.push(item); children.set(item.parentTaskPath, rows);
   }
-  for (const rows of children.values()) rows.sort((a,b) => a.title.localeCompare(b.title,'ja'));
+  for (const rows of children.values()) rows.sort((a,b) => a.title.localeCompare(b.title));
   return children;
 }
 export function canParent(items: Item[], childPath: string, parentPath: string): boolean {

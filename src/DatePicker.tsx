@@ -11,7 +11,7 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
   const host = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null), popup = useRef<HTMLDivElement>(null);
   const cells = useMemo(() => monthDays(month), [month]);
   const counts = useMemo(() => new Map(cells.map(date => {
-    const start = dayStart(date), end = start + 86400000;
+    const start = dayStart(date), end = dayStart(moveDay(date, 1));
     return [date, items.filter(i => i.kind !== 'project' && (i.targetDate === date || (hasSchedule(i) && i.start! < end && i.end! > start))).length];
   })), [cells, items]);
   const choose = (date: string | null) => { onChange(date); setOpen(false); trigger.current?.focus(); };
@@ -35,8 +35,8 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
     <button className="daylight-date" ref={trigger} aria-label="日付を選択" aria-haspopup="dialog" aria-expanded={open} onClick={() => {
       if (!open) { setMonth(day); setFocused(day); } setOpen(!open);
     }}>
-      <span>{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'long', day: 'numeric' }).format(dayStart(day))}</span>
-      <span className="daylight-weekday">{new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(dayStart(day))}</span>
+      <span>{new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric' }).format(dayStart(day))}</span>
+      <span className="daylight-weekday">{new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(dayStart(day))}</span>
     </button>
     {open && <div className="daylight-calendar-popover" ref={popup} role="dialog" aria-label="日付を選択" aria-modal="false">
       <div className="daylight-calendar-head">

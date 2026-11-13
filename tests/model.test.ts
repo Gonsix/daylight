@@ -6,10 +6,13 @@ const item = (patch: Partial<Item> = {}): Item => ({ path: 'notes/test.md', titl
   targetDate: '2026-11-06', start: null, end: null, due: null, projectPath: null, projectLabel: '', archived: false, ...patch });
 const timed = (start: string, end: string, patch: Partial<Item> = {}) => item({ start: dateTime(start), end: dateTime(end), ...patch });
 
-test('Tokyo days, month/year boundaries and leap dates', () => {
-  assert.equal(dayKey(Date.parse('2026-11-05T15:00:00Z')), '2026-11-06');
+test('local days, month/year boundaries, leap dates and DST transitions', () => {
+  assert.equal(dayKey(new Date(2026, 10, 6, 0, 0, 0).getTime()), '2026-11-06');
+  assert.equal(dayKey(new Date(2026, 10, 5, 23, 59, 59).getTime()), '2026-11-05');
+  assert.equal(dateTime('2026-11-06T13:07:00'), new Date(2026, 10, 6, 13, 7, 0).getTime());
   assert.equal(moveDay('2026-12-31', 1), '2027-01-01');
   assert.equal(moveDay('2026-03-01', -1), '2026-02-28');
+  assert.equal(moveDay('2026-11-01', 1), '2026-11-02');
   assert.equal(validDay('2026-02-30'), false);
   assert.equal(validDay('2028-02-29'), true);
   assert.equal(dateTime('2026-11-06T24:00:00'), null);
@@ -94,13 +97,13 @@ test('timeline retains all five statuses including completed, held and cancelled
   const list=['todo','on_going','done','on_hold','cancelled'].map((status,i)=>timed('2026-11-06T09:00:00','2026-11-06T10:00:00',{status,path:String(i)}));
   assert.equal(timeline(list,'2026-11-06').length,5);
 });
-test('completion timestamps use the actual Tokyo day and reset only when completion is undone',()=>{
+test('completion timestamps use the actual local day and reset only when completion is undone',()=>{
   const fm:Record<string,unknown>={status:'done',target_date:'2026-11-01'};
-  recordTaskCompletion(fm,'todo',Date.parse('2026-11-05T15:07:23Z'));
+  recordTaskCompletion(fm,'todo',new Date(2026,10,6,0,7,23).getTime());
   assert.equal(fm['completed at'],'2026-11-06T00:07:23');
-  recordTaskCompletion(fm,'done',Date.parse('2026-11-07T01:00:00Z'));assert.equal(fm['completed at'],'2026-11-06T00:07:23');
+  recordTaskCompletion(fm,'done',new Date(2026,10,7,10,0,0).getTime());assert.equal(fm['completed at'],'2026-11-06T00:07:23');
   fm.status='on_hold';recordTaskCompletion(fm,'done');assert.equal(fm['completed at'],null);
-  fm.status='done';recordTaskCompletion(fm,'on_hold',Date.parse('2026-11-07T01:00:00Z'));assert.equal(fm['completed at'],'2026-11-07T10:00:00');
+  fm.status='done';recordTaskCompletion(fm,'on_hold',new Date(2026,10,7,10,0,0).getTime());assert.equal(fm['completed at'],'2026-11-07T10:00:00');
 });
 test('completed section uses completion date instead of target date and never guesses missing timestamps',()=>{
   const today=item({path:'done',status:'done',targetDate:'2026-11-01',completedAt:dateTime('2026-11-06T12:03:00')});

@@ -17,23 +17,42 @@ export interface Item {
 }
 export const isStatus = (value: string): value is Status => Object.hasOwn(STATUS, value);
 export const isActive = (item: Item) => !['done', 'cancelled'].includes(item.status);
-const DAY = 86400000;
+function dayParts(day: string): [number, number, number] | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const [y, m, d] = day.split('-').map(Number);
+  return [y, m, d];
+}
 export function dayKey(time = Date.now()): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(time);
-  return ['year', 'month', 'day'].map(k => parts.find(p => p.type === k)?.value).join('-');
+  const d = new Date(time);
+  if (!Number.isFinite(d.getTime())) return '';
+  return `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 export function validDay(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const time = Date.parse(`${value}T00:00:00+09:00`);
-  return Number.isFinite(time) && dayKey(time) === value;
+  const parts = dayParts(value);
+  if (!parts) return false;
+  const [y, m, d] = parts;
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCFullYear(y);
+  return utc.getUTCFullYear() === y && utc.getUTCMonth() === m - 1 && utc.getUTCDate() === d;
 }
-export const dayStart = (day: string) => Date.parse(`${day}T00:00:00+09:00`);
+export function dayStart(day: string): number {
+  const parts = dayParts(day);
+  if (!parts || !validDay(day)) return NaN;
+  const [y, m, d] = parts;
+  const local = new Date(y, m - 1, d, 0, 0, 0, 0);
+  local.setFullYear(y);
+  return local.getTime();
+}
 export function centeredScrollTop(position: number, viewportHeight: number, contentHeight: number): number {
   return Math.max(0, Math.min(Math.max(0, contentHeight - viewportHeight), position - viewportHeight / 2));
 }
-export const moveDay = (day: string, delta: number) => dayKey(dayStart(day) + delta * DAY);
+export function moveDay(day: string, delta: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  utc.setUTCFullYear(y);
+  utc.setUTCDate(utc.getUTCDate() + delta);
+  return `${String(utc.getUTCFullYear()).padStart(4, '0')}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
+}
 export function moveMonth(day: string, delta: number): string {
   const [year, month, date] = day.split('-').map(Number);
   const first = new Date(Date.UTC(year, month - 1 + delta, 1));
@@ -56,13 +75,17 @@ export function dateTime(value: unknown): number | null {
   const [day, time] = value.split('T');
   const [h, m, s = 0] = time.split(':').map(Number);
   if (!validDay(day) || h > 23 || m > 59 || s > 59) return null;
-  return Date.parse(`${value}+09:00`);
+  const [y, mo, d] = day.split('-').map(Number);
+  const local = new Date(y, mo - 1, d, h, m, s, 0);
+  local.setFullYear(y);
+  return Number.isFinite(local.getTime()) ? local.getTime() : null;
 }
 export function timeLabel(time: number): string {
-  return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(time);
+  const d = new Date(time);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 export function localTimestamp(time=Date.now()):string {
-  return `${dayKey(time)}T${timeLabel(time)}:${String(Math.floor(time%60000/1000)).padStart(2,'0')}`;
+  return `${dayKey(time)}T${timeLabel(time)}:${String(new Date(time).getSeconds()).padStart(2,'0')}`;
 }
 export function recordTaskCompletion(properties:Record<string,unknown>,previousStatus:unknown,now=Date.now()):void {
   if(properties.status==='done'&&previousStatus!=='done')properties['completed at']=localTimestamp(now);
@@ -70,16 +93,16 @@ export function recordTaskCompletion(properties:Record<string,unknown>,previousS
 }
 export function completedTasks(items:Item[],day:string):Item[] {
   return items.filter(i=>i.kind==='task'&&i.status==='done'&&i.completedAt!=null&&dayKey(i.completedAt)===day)
-    .sort((a,b)=>b.completedAt!-a.completedAt!||a.title.localeCompare(b.title,'ja'));
+    .sort((a,b)=>b.completedAt!-a.completedAt!||a.title.localeCompare(b.title));
 }
 export function titleFor(name: string, kind: Kind): string {
   return kind === 'project' ? name : name.replace(/ (?:\d{4}-\d{2}-\d{2}|TBD)(?: \d+)?$/, '');
 }
 export const hasSchedule = (item: Item) => item.start !== null && item.end !== null && item.end > item.start;
 export interface Slot { item: Item; start: number; end: number; column: number; columns: number; source: 'schedule' | 'actual'; from: number; to: number; running: boolean; }
-/** Minutes in the selected Tokyo day. Connected overlaps share a lane count. */
+/** Minutes in the selected local day. Connected overlaps share a lane count. */
 export function timeline(items: Item[], day: string, now = Date.now()): Slot[] {
-  const start = dayStart(day), end = start + DAY;
+  const start = dayStart(day), end = dayStart(moveDay(day, 1));
   const slots: Slot[] = items.flatMap(item => {
     if (item.kind === 'project') return [];
     const ranges: {source:'schedule'|'actual';from:number;to:number;running:boolean}[] = [];
@@ -108,15 +131,16 @@ export function timeline(items: Item[], day: string, now = Date.now()): Slot[] {
 function hasWorkOnDay(item: Item, day: string): boolean {
   if (item.taskStart == null) return false;
   const end = item.taskEnd ?? (item.status === 'on_going' ? Date.now() : item.taskStart);
-  return dayKey(item.taskStart) === day || (item.taskStart < dayStart(day) + DAY && end > dayStart(day));
+  return dayKey(item.taskStart) === day || (item.taskStart < dayStart(moveDay(day, 1)) && end > dayStart(day));
 }
 export type TaskTab = 'day' | 'ongoing' | 'unscheduled' | 'all';
 export function filterTasks(items: Item[], day: string, tab: TaskTab): Item[] {
+  const nextStart = dayStart(moveDay(day, 1)), start = dayStart(day);
   return items.filter(i => i.kind === 'task' && (
     tab === 'all' || (tab === 'ongoing' && i.status === 'on_going') ||
     (tab === 'unscheduled' && !i.targetDate && !hasSchedule(i)) ||
-    (tab === 'day' && (i.targetDate === day || hasWorkOnDay(i,day) || (hasSchedule(i) && i.start! < dayStart(day) + DAY && i.end! > dayStart(day))))
-  )).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.title.localeCompare(b.title, 'ja'));
+    (tab === 'day' && (i.targetDate === day || hasWorkOnDay(i,day) || (hasSchedule(i) && i.start! < nextStart && i.end! > start)))
+  )).sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.title.localeCompare(b.title));
 }
 
 export function carryovers(items: Item[], day: string): Item[] {
