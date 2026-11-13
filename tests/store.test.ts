@@ -10,12 +10,21 @@ class File {
   extension = 'md'; basename: string;
   constructor(public path: string) { this.basename = path.split('/').at(-1)!.replace(/\.md$/, ''); }
 }
+class Folder {
+  constructor(public path: string, private files: File[]) {}
+  get children(): (File | Folder)[] {
+    const prefix = this.path + '/';
+    const paths = this.files.filter(f => f.path.startsWith(prefix));
+    const dirs = new Set(paths.map(f => f.path.slice(prefix.length).split('/')).filter(parts => parts.length > 1).map(parts => parts[0]));
+    return [...paths.filter(f => !f.path.slice(prefix.length).includes('/')), ...[...dirs].map(dir => new Folder(prefix + dir, this.files))];
+  }
+}
 const compiled = build({loader:{'.md':'text'}, entryPoints: [path.resolve('src/store.ts')], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['obsidian'] });
 async function fixture() {
   const module = { exports: {} as any };
   const require = createRequire(path.join(process.cwd(), 'package.json'));
   vm.runInNewContext((await compiled).outputFiles[0].text, { module, exports: module.exports,
-    require: (id: string) => id === 'obsidian' ? { TFile: File,
+    require: (id: string) => id === 'obsidian' ? { TFile: File, TFolder: Folder,
       parseYaml: (source:string) => source.trim().startsWith('{') ? JSON.parse(source) : ({ tags:['event'],status:'todo','created at':'','last updated':null }),
       stringifyYaml: JSON.stringify,
     } : require(id), Intl, Date, console });
@@ -34,7 +43,7 @@ async function fixture() {
     metadataCache: { on: () => ({}), getFileCache: (f: File) => ({ frontmatter: fm.get(f.path) }),
       getFirstLinkpathDest: (link: string) => files.find(f=>f.path.replace(/\.md$/,'')===link||f.basename===link)??null },
     vault: { on: () => ({}), getMarkdownFiles: () => files,
-      getAbstractFileByPath: (p: string) => templates.find(f => f.path === p) ?? files.find(f => f.path === p),
+      getAbstractFileByPath: (p: string): File | Folder | null | undefined => templates.find(f => f.path === p) ?? files.find(f => f.path === p) ?? (files.some(f => f.path.startsWith(p + '/')) ? new Folder(p, files) : null),
       read: async (f: File) => templates.includes(f) ? readFileSync('templates/'+f.path.split('/').at(-1),'utf8') : bodies.get(f.path) ?? '',
       create: async (p:string,content:string) => {
         if (files.some(f=>f.path===p)) throw new Error('File already exists');
@@ -67,6 +76,15 @@ test('frontmatter kinds, project resolution, scheduled tasks and scope', async (
   const row=items.find((i:any)=>i.path===task.path);
   assert.equal(row.kind,'task'); assert.equal(row.projectPath,project.path);
   assert.equal(row.end-row.start,3600000);
+});
+test('item discovery visits only configured folders including nested notes', async () => {
+  const {store, app, files, fm} = await fixture();
+  const nested = new File('Daylight/Events/2026/Meeting.md');
+  files.push(nested); fm.set(nested.path, {tags:['event'], status:'todo'});
+  app.vault.getMarkdownFiles = () => { throw new Error('must not scan the vault'); };
+  assert.deepEqual(Array.from(store.items(), (item: any) => item.path).sort(), [
+    'Daylight/Events/2026/Meeting.md', 'Daylight/Projects/P.md', 'Daylight/Tasks/Task 2026-11-06.md',
+  ]);
 });
 test('status saves preserve unrelated properties and refuse stale edits', async () => {
   const {store,task,fm}=await fixture();

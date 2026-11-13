@@ -19,8 +19,9 @@ async function loadPlugin(saved: any = null, existing: any[] = [], storageError?
     addCommand(command:any){registrations.command=command;}
     registerMarkdownCodeBlockProcessor(type:string,callback:any){registrations.markdown={type,callback};(registrations.markdowns??={})[type]=callback;}
   }
-  class TFile {constructor(public path:string){}}
-  class TFolder {constructor(public path:string){}}
+  class TFile { extension='md'; constructor(public path:string){}}
+  class TFolder { children:any[]=[]; constructor(public path:string){}}
+  registrations.TFile = TFile;
   const storageFiles=new Map<string,any>();
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
@@ -143,7 +144,13 @@ test('startup waits for unresolved dashboard metadata before marking the store r
   const { plugin, registrations } = await loadPlugin();
   let resolved: (() => void) | undefined;
   let removed = false;
-  plugin.app.vault.getMarkdownFiles = () => [{ path: 'Daylight/Tasks/example.md' }];
+  // Storage folders are created during layout initialization.
+  const originalLookup = plugin.app.vault.getAbstractFileByPath;
+  plugin.app.vault.getAbstractFileByPath = (path: string) => {
+    const result = originalLookup(path);
+    if (path === 'Daylight/Tasks' && result) result.children = [new registrations.TFile('Daylight/Tasks/example.md')];
+    return result;
+  };
   plugin.app.metadataCache.getFileCache = () => null;
   plugin.app.metadataCache.on = (name: string, callback: () => void) => {
     assert.equal(name, 'resolved'); resolved = callback; return {};

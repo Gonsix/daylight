@@ -55,7 +55,7 @@ export class DaylightStore {
   snapshot = () => this.revision;
   isReady = () => this.ready;
   async prepareStartup(): Promise<void> {
-    const files = this.app.vault.getMarkdownFiles().filter(file => this.storage.kind(file.path) !== null);
+    const files = this.storage.markdownFiles();
     if (files.every(file => this.app.metadataCache.getFileCache(file) != null)) return;
     // Some files may never have a cache (for example, an empty note), so do not
     // leave the dashboard blocked indefinitely if no further event arrives.
@@ -79,7 +79,7 @@ export class DaylightStore {
   }
   items(): Item[] {
     if (this.cache) return this.cache;
-    this.cache = this.app.vault.getMarkdownFiles().filter(f => this.storage.kind(f.path) !== null).flatMap(file => {
+    this.cache = this.storage.markdownFiles().flatMap(file => {
       const cached = this.app.metadataCache.getFileCache(file), fm = cached?.frontmatter;
       if (!fm) return [];
       const tags: string[] = Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [];

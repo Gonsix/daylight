@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from 'obsidian';
+import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { Kind } from './model';
 import taskTemplate from '../templates/Task.md';
 import eventTemplate from '../templates/Event.md';
@@ -28,6 +28,18 @@ export class DaylightStorage {
   folder(kind: Kind) {return `${this.root}/${FOLDERS[kind]}`;}
   template(kind: Kind) {return `${this.root}/Templates/${kind === 'task' ? 'Task' : kind === 'event' ? 'Event' : 'Project'}.md`;}
   kind(path: string): Kind | null {return (Object.keys(FOLDERS) as Kind[]).find(kind=>path.startsWith(this.folder(kind)+'/')) ?? null;}
+  markdownFiles(): TFile[] {
+    const files: TFile[] = [];
+    const visit = (entry: TAbstractFile) => {
+      if (entry instanceof TFolder) entry.children.forEach(visit);
+      else if (entry instanceof TFile && entry.extension === 'md') files.push(entry);
+    };
+    for (const kind of Object.keys(FOLDERS) as Kind[]) {
+      const folder = this.app.vault.getAbstractFileByPath(this.folder(kind));
+      if (folder instanceof TFolder) visit(folder);
+    }
+    return files;
+  }
   async ensure() {
     for(const path of [this.root,...Object.values(FOLDERS).map(f=>`${this.root}/${f}`),`${this.root}/Templates`])await ensureFolder(this.app,path);
     for(const [name,content] of Object.entries(TEMPLATES)) {
