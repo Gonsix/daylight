@@ -10,10 +10,10 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
   const [open, setOpen] = useState(false), [month, setMonth] = useState(day), [focused, setFocused] = useState(day);
   const host = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null), popup = useRef<HTMLDivElement>(null);
   const cells = useMemo(() => monthDays(month), [month]);
-  const counts = useMemo(() => new Map(cells.map(date => {
+  const counts = useMemo(() => !open ? new Map<string, number>() : new Map(cells.map(date => {
     const start = dayStart(date), end = dayStart(moveDay(date, 1));
     return [date, items.filter(i => i.kind !== 'project' && (i.targetDate === date || (hasSchedule(i) && i.start! < end && i.end! > start))).length];
-  })), [cells, items]);
+  })), [open, cells, items]);
   const choose = (date: string | null) => { onChange(date); setOpen(false); trigger.current?.focus(); };
   useEffect(() => {
     if (!open) return;

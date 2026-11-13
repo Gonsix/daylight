@@ -204,6 +204,13 @@ function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore
   const scoped = useMemo(() => items.filter(i => !project || i.kind === 'project' || i.projectPath === project), [items, project]);
   const boardTasks = useMemo(() => kanbanTasks(scoped,day,tab),[scoped,day,tab]);
   const projects = items.filter(i => i.kind === 'project' && !i.archived && isActive(i));
+  const projectCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) if (item.kind === 'task' && item.projectPath && isActive(item)) {
+      counts.set(item.projectPath, (counts.get(item.projectPath) ?? 0) + 1);
+    }
+    return counts;
+  }, [items]);
   const currentProject = items.find(i => i.path === project);
   const selectedItem = items.find(i => i.path === selected);
   const invalid = scoped.filter(i => i.kind !== 'project' && !hasSchedule(i) && (i.targetDate === day || (i.start !== null && dayKey(i.start) === day)) && (i.kind === 'event' || i.start !== null || i.end !== null));
@@ -231,7 +238,7 @@ function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore
           {invalid.map(i => <button key={i.path} className="daylight-schedule-warning" onClick={e => select(i.path, e)}><Icon name={i.kind} /><span>{i.title}</span></button>)}</section>}
         <section className="daylight-panel daylight-projects"><div className="daylight-section-head"><h2>プロジェクト</h2><span className="daylight-count">{projects.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="プロジェクトを追加" title="プロジェクトを追加" onClick={() => openProjectModal(store)}>＋</button></div>
           <div className="daylight-project-grid">{projects.map(p => {
-            const count = items.filter(i => i.kind === 'task' && i.projectPath === p.path && isActive(i)).length;
+            const count = projectCounts.get(p.path) ?? 0;
             return <article className={`daylight-project${project === p.path ? ' is-selected' : ''}`} key={p.path} onClick={e => { if (!(e.target as Element).closest('button,select,input,textarea')) select(p.path, e); }}>
               <button className="daylight-project-main" aria-pressed={project === p.path} onClick={e => { if (e.metaKey || e.ctrlKey) select(p.path, e); else setProject(project === p.path ? null : p.path); }}><Icon name="project" /><strong>{p.title}</strong><span>{count}</span></button>
               <div className="daylight-project-bottom"><StatusSelect item={p} store={store} /><button className="daylight-icon-button" aria-label={`${p.title}の詳細`} onClick={e => select(p.path, e)}><Icon name="open" size={14} /></button></div>

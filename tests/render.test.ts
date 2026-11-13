@@ -7,6 +7,16 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { dateTime, Item } from '../src/model';
+import { DatePicker } from '../src/DatePicker';
+
+test('closed date picker does not scan items to calculate calendar counts', () => {
+  const items = new Proxy([] as Item[], { get(target, key, receiver) {
+    if (key === 'filter') throw new Error('calendar counted items while closed');
+    return Reflect.get(target, key, receiver);
+  } });
+  const html = renderToStaticMarkup(React.createElement(DatePicker, {day:'2026-11-06', today:'2026-11-06', items, onChange:()=>{}}));
+  assert.ok(html.includes('日付を選択'));
+});
 
 test('React renders timeline, inline state menus, project and carried-over kanban cards without network or Obsidian runtime', async () => {
   const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['obsidian','react','react/*','react-dom/*']});
