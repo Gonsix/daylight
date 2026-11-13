@@ -178,6 +178,8 @@ sort_order: 10000
 
 ソースは`src/`、配布ファイルは`main.js`・`manifest.json`・`styles.css`です。
 
+起動、データ保存、タスク、タイムラインなどの内部処理は[機能仕様](docs/specs/README.md)を参照してください。
+
 ### Vault外で開発してビルド・インストール
 
 Node.jsとnpm、Bash（macOS・Linux・WindowsのGit Bashなど）が必要です。リポジトリはVault外の任意の開発用フォルダにクローンできます。
