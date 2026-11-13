@@ -129,6 +129,20 @@ export function titleFor(name: string, kind: Kind): string {
 }
 export const hasSchedule = (item: Item) => item.start !== null && item.end !== null && item.end > item.start;
 export interface Slot { item: Item; start: number; end: number; column: number; columns: number; source: 'schedule' | 'actual'; from: number; to: number; running: boolean; }
+/** Select possible contributors once per item/day change, including open sessions. */
+export function timelineCandidates(items: Item[], day: string): Item[] {
+  const start = dayStart(day), end = dayStart(moveDay(day, 1));
+  return items.filter(item => {
+    if (item.kind === 'project') return false;
+    if (hasSchedule(item) && item.start! < end && item.end! > start) return true;
+    if (item.kind !== 'task') return false;
+    const sessions = itemSessions(item);
+    return sessions.some((session, index) => {
+      const running = item.status === 'on_going' && session.end == null && index === sessions.length - 1;
+      return session.start < end && (running || (session.end !== null && session.end > start));
+    });
+  });
+}
 /** Minutes in the selected local day. Connected overlaps share a lane count. */
 export function timeline(items: Item[], day: string, now = Date.now()): Slot[] {
   const start = dayStart(day), end = dayStart(moveDay(day, 1));

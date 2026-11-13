@@ -6,12 +6,12 @@ import { TimeSelection } from './TimeSelection';
 import { openEditEventModal, openEventModal } from './EventModal';
 import { rangeDateTimes } from './event';
 import { openTaskModal, openProjectModal } from './CreateModal';
-import { workDuration } from './execution';
+import { isTaskRunning, workDuration } from './execution';
 import { openDeleteNoteModal } from './DeleteNoteModal';
 import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
 import { submitOnCommandEnter } from './shortcuts';
-import { centeredScrollTop, dayKey, dayStart, formatDuration, hasSchedule, isActive, isStatus, Item, itemSessions, moveDay, STATUS, TaskTab, timeline, timeLabel } from './model';
+import { centeredScrollTop, dayKey, dayStart, formatDuration, hasSchedule, isActive, isStatus, Item, itemSessions, moveDay, STATUS, TaskTab, timeline, timelineCandidates, timeLabel } from './model';
 
 function Icon({ name, size = 16 }: { name: string; size?: number }) {
   const paths: Record<string, React.ReactNode> = {
@@ -39,7 +39,10 @@ function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
   </select>;
 }
 function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string, event?: React.MouseEvent) => void; projectPath: string }) {
-  const slots = useMemo(() => timeline(items, day, now), [items, day, now]);
+  const candidates = useMemo(() => timelineCandidates(items, day), [items, day]);
+  const running = useMemo(() => candidates.some(isTaskRunning), [candidates]);
+  const timelineNow = running ? now : 0;
+  const slots = useMemo(() => timeline(candidates, day, timelineNow), [candidates, day, timelineNow]);
   const firstHour = 0;
   const lastHour = 24;
   const start = firstHour * 60, total = (lastHour - firstHour) * 60;

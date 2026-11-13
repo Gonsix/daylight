@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMemo, carryovers, centeredScrollTop, completedTasks, dateTime, dayKey, dayStart, filterTasks, Item, monthDays, moveDay, moveMonth, notesText, recordTaskCompletion, timeline, validDay } from '../src/model';
+import { appendMemo, carryovers, centeredScrollTop, completedTasks, dateTime, dayKey, dayStart, filterTasks, Item, monthDays, moveDay, moveMonth, notesText, recordTaskCompletion, timeline, timelineCandidates, validDay } from '../src/model';
 
 const item = (patch: Partial<Item> = {}): Item => ({ path: 'notes/test.md', title: 'Test', kind: 'task', status: 'todo',
   targetDate: '2026-11-06', start: null, end: null, due: null, projectPath: null, projectLabel: '', archived: false, ...patch });
@@ -29,6 +29,21 @@ test('cross-midnight schedules are clipped to the selected day without duplicate
   const slots = timeline([a], '2026-11-06');
   assert.equal(slots.length, 1); assert.equal(slots[0].start, 0); assert.equal(slots[0].end, 60);
   assert.equal(timeline([timed('2026-11-05T23:00:00','2026-11-06T00:00:00')], '2026-11-06').length,0);
+});
+test('timeline candidates preserve cross-day and running slots while excluding unrelated history', () => {
+  const day = '2026-11-06';
+  const rows = [
+    timed('2026-11-05T23:00:00','2026-11-06T01:00:00',{path:'cross',kind:'event'}),
+    timed('2026-10-01T09:00:00','2026-10-01T10:00:00',{path:'old',kind:'event'}),
+    item({path:'running',status:'on_going',taskSessions:[{start:dateTime('2026-11-05T23:00:00')!,end:null}]}),
+    item({path:'finished',status:'done',taskSessions:[{start:dateTime('2026-11-06T10:00:00')!,end:dateTime('2026-11-06T11:00:00')!}]}),
+    item({path:'boundary',status:'done',taskSessions:[{start:dateTime('2026-11-05T23:00:00')!,end:dayStart(day)}]}),
+  ];
+  const candidates = timelineCandidates(rows, day);
+  assert.deepEqual(candidates.map(i=>i.path), ['cross','running','finished']);
+  for (const now of [dayStart(day), dateTime('2026-11-06T12:00:00')!]) {
+    assert.deepEqual(timeline(candidates, day, now), timeline(rows, day, now));
+  }
 });
 test('overlap components get distinct lanes, reused for later non-overlapping events', () => {
   const list = [timed('2026-11-06T09:00:00','2026-11-06T11:00:00',{path:'a'}),timed('2026-11-06T09:30:00','2026-11-06T10:00:00',{path:'b'}),timed('2026-11-06T10:00:00','2026-11-06T10:30:00',{path:'c'}),timed('2026-11-06T12:00:00','2026-11-06T13:00:00',{path:'d'})];
