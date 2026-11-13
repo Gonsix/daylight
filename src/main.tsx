@@ -18,14 +18,20 @@ class DaylightSettingTab extends PluginSettingTab {
     this.containerEl.empty();
     const language = this.dashboard.settings.language;
     new Setting(this.containerEl).setName(translate(language, 'language'))
-      .addDropdown(dropdown => dropdown
-        .addOptions(Object.fromEntries(LANGUAGES.map(id => [id, LANGUAGE_INFO[id].name])))
-        .setValue(language).onChange(async value => {
+      .addDropdown(dropdown => {
+        // Build this plugin's list explicitly, even if the host supplied options.
+        dropdown.selectEl.replaceChildren();
+        dropdown.selectEl.setAttribute('data-daylight-setting', 'language');
+        dropdown.selectEl.setAttribute('aria-label', `Daylight · ${translate(language, 'language')}`);
+        for (const id of LANGUAGES) dropdown.addOption(id, LANGUAGE_INFO[id].name);
+        dropdown.setValue(language).onChange(async value => {
+          if (!LANGUAGES.includes(value as Language)) return;
           const previous = this.dashboard.settings.language;
           this.dashboard.settings.language = parseLanguage(value);
           try { await this.dashboard.saveSettings(); this.display(); }
           catch { this.dashboard.settings.language = previous; dropdown.setValue(previous); new Notice(t("設定を保存できませんでした。")); }
-        }));
+        });
+      });
     let root = this.dashboard.settings.rootFolder;
     new Setting(this.containerEl).setName(t("Daylightフォルダの配置場所"))
       .setDesc(t("Vault内の配置場所です。保存するとタスク・予定・プロジェクト・テンプレートをまとめて移動します。例: Daylight / etc/Daylight"))

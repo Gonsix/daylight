@@ -28,7 +28,7 @@ async function loadPlugin(saved: any = null, existing: any[] = [], storageError?
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
   vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,setTimeout,clearTimeout,
-    require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class { setName(name:string){(registrations.settingNames??=[]).push(name);return this;} setDesc(){return this;} addText(){return this;} addButton(){return this;} addToggle(){return this;} addDropdown(callback:any){const dropdown={addOptions:()=>dropdown,setValue:()=>dropdown,onChange:(handler:any)=>{registrations.changeLanguage=handler;return dropdown;}};callback(dropdown);return this;} },Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
+    require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class { setName(name:string){(registrations.settingNames??=[]).push(name);return this;} setDesc(){return this;} addText(){return this;} addButton(){return this;} addToggle(){return this;} addDropdown(callback:any){const dropdown={selectEl:{replaceChildren:()=>{registrations.languageOptions={};},setAttribute:()=>{}},addOption:(value:string,label:string)=>{registrations.languageOptions[value]=label;return dropdown;},setValue:(value:string)=>{registrations.selectedLanguage=value;return dropdown;},onChange:(handler:any)=>{registrations.changeLanguage=handler;return dropdown;}};registrations.languageOptions={'ar':'العربية','en-GB':'English (GB)'};callback(dropdown);return this;} },Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
   const plugin=new module.exports.default();
   plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getMarkdownFiles:()=>[],getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{if(!layoutReady)throw new Error('Vault not ready');if(storageError)throw storageError;storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=()=>{layoutReady=true;return callback();};},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
   await plugin.onload();
@@ -211,4 +211,21 @@ test('all translated settings persist and update the language selector', async (
     assert.equal(restored.plugin.settings.language, language);
     assert.equal(restored.plugin.store.language, language);
   }
+});
+
+
+test('Daylight language selector contains only the registered dictionaries', async () => {
+  const {plugin,registrations} = await loadPlugin();
+  registrations.settingsTab.containerEl = {empty:()=>{}};
+  registrations.settingsTab.display();
+  assert.deepEqual(Object.keys(registrations.languageOptions).sort(), [...i18n.LANGUAGES].sort());
+  assert.equal(Object.keys(registrations.languageOptions).length, 9);
+  assert.equal(registrations.languageOptions['en-GB'], undefined);
+  assert.equal(registrations.languageOptions.ar, undefined);
+  await registrations.changeLanguage('en-GB');
+  assert.equal(plugin.settings.language, 'en');
+  assert.equal(registrations.saved, undefined);
+  await registrations.changeLanguage('de');
+  assert.equal(registrations.saved.language, 'de');
+  assert.equal(Object.keys(registrations.languageOptions).length, 9);
 });
