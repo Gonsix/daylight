@@ -1,60 +1,106 @@
+<div align="center">
+
 # Daylight
 
-A daily timeline, Kanban tasks, and projects for Obsidian. Your data stays in Markdown notes in your vault.
+**Plan your day. Move your work forward. Keep it in Obsidian.**
 
-React製のObsidianプラグイン。予定と時間指定タスクを縦のタイムラインに表示し、タスク・プロジェクトの確認、状態変更、メモ追記を行えます。HearthやBasesに依存せず動作します。
+A daily timeline, a Kanban board, and your projects — together in one view.
 
-## インストール
+**English** · [日本語](README.ja.md)
 
-現在はGitHub Releasesから手動でインストールできます。Obsidianのコミュニティプラグイン一覧への登録は準備中です。
+[![Obsidian](https://img.shields.io/badge/Obsidian-1.8.7%2B-6c31e3)](https://obsidian.md/)
+[![Platforms](https://img.shields.io/badge/platforms-desktop%20%26%20mobile-426887)](#install)
+[![Languages](https://img.shields.io/badge/UI-9%20languages-357968)](#choose-your-language)
+[![License: MIT](https://img.shields.io/badge/license-MIT-526275)](LICENSE)
 
-1. [最新リリース](https://github.com/Gonsix/daylight/releases/latest)から `main.js`・`manifest.json`・`styles.css` をダウンロードします。
-2. Vault内に `.obsidian/plugins/daylight/` を作成し、3ファイルをその直下に配置します。
-3. Obsidianを再起動し、「設定 → コミュニティプラグイン」でDaylightを有効にします。
+[Features](#one-place-for-your-day) · [Install](#install) · [Get started](#your-first-day-with-daylight) · [Languages](#choose-your-language)
 
-デスクトップ・モバイルに対応しています。日時は端末のローカルタイムゾーンを使用し、UIは英語・日本語・中国語（簡体字／繁体字）・韓国語・スペイン語・ドイツ語・フランス語・ポルトガル語（ブラジル）の9言語に対応しています。新規設定では英語が既定です。設定 → Daylight → Language（言語）で切り替えられます。タスクを削除すると元のノートがゴミ箱へ移動するため、導入前にVaultのバックアップをおすすめします。
+</div>
 
-## 保存先と初期セットアップ
+![Daylight in English: a daily timeline beside a Kanban board and project cards.](docs/images/overview.en.png)
 
-初回起動時に、Vault内へ以下のフォルダと3種類のテンプレートを自動配置します。既存のテンプレートは上書きしません。
+*The Daylight UI rendered with fictional sample data in a browser preview. Obsidian themes and screen sizes may change its appearance.*
 
-```text
-Daylight/
-  Tasks/
-  Events/
-  Projects/
-  Templates/
-    Task.md
-    Event.md
-    Project.md
-```
+## One place for your day
 
-設定 → Daylight →「Daylightフォルダの配置場所」で `etc/Daylight` などに変更できます。先頭の `/` はVaultルートを意味します。「保存して移動」でタスク・予定・プロジェクト・カスタマイズ済みテンプレートをまとめて移動し、ObsidianのFileManagerで内部リンクを更新します。移動先が存在する場合は上書きやマージをせずエラーを表示します。設定の保存に失敗した場合は元の配置へ戻します。
+| See your time | Organize your tasks | Stay connected to projects |
+| :--- | :--- | :--- |
+| View events, scheduled tasks, and actual work on a daily timeline. | Move cards through your workflow, choose their order, and break work into subtasks. | Filter your day by project and open the notes behind your work. |
 
-以降の `Daylight/` は既定の配置場所です。タスク・予定・プロジェクトはタグとそれぞれのフォルダで識別し、Templatesや別プラグインのフォルダは読み取り対象にしません。新規作成と日付変更による名前変更も、設定した配置場所に従います。テンプレートの既定内容は、このプラグインの `templates/` に同梱しています。
+### Plan on the timeline
 
-## 開く
+See meetings and scheduled work together, with a current-time line to find your place in the day. Overlapping events share the timeline, and work that crosses midnight appears on the days it belongs to.
 
-Obsidian再起動後、コマンドパレットの **Daylight: Daylightを開く**、または左リボンのカレンダー時計アイコンから開きます。
+Drag an empty area to select a time range, adjust its handles, and add an event. Selection uses 30-minute steps; the event form lets you set times to the minute. Click an existing event to edit it.
 
-## 起動時のホーム画面
+### Keep tasks moving
 
-設定 → Daylight の「起動時にDaylightを開く」をオンにすると、レイアウト復元後に専用タブを表示します。既存のダッシュボードタブがあれば再利用し、他のノートは閉じません。設定は保存され、次回起動から反映します（プラグインの再読み込み時も適用）。初期値はオフです。
+The Kanban board shows **Todo**, **On going**, and **Done**, with **On hold** and **Cancelled** available when you need them.
 
-Hearthなど他のプラグインの起動時表示はオフにしてください。Homepageプラグインは不要です。
+- Drag cards between columns to change their status.
+- Drop near the top or bottom of a card to reorder tasks in the same column.
+- Drop in the center of a card to make it a parent task, or choose a parent from the menu.
+- Switch between **Today**, **On going**, **Unscheduled**, and **All**, or search by task or project.
+- Keep unfinished work in view: the selected day also includes carryovers and tasks completed that day.
 
-## ノートに埋め込む
+### Record the work you actually do
 
-以下のコードブロックを追加します。閲覧モード・ライブプレビューで表示します。
+Use the controls on a task card to **start, pause, resume, and finish** work. Daylight keeps separate work sessions, so breaks do not count toward your work duration. You can run more than one task at a time.
 
-プラグインフォルダ・IDは `daylight` です。旧 `vault-dashboard` コードブロックも互換用に読み込めます。
+Actual work appears alongside the original schedule. Review your sessions and total completed work time in the task details.
 
-````markdown
-```daylight
-```
-````
+### Bring projects and notes together
 
-`daily_notes/01_daily/YYYY-MM-DD.md` 内ではそのノートの日付、それ以外では端末のローカル時刻の今日を表示します。
+Create projects, set goals, and connect tasks and events to them. Select a project to focus the dashboard on its work. Parent tasks show their direct subtasks and completion counts.
+
+Open task details to edit dates, deadlines, links, and custom properties. Add a note while you work, or open the underlying Markdown note in Obsidian.
+
+### Your notes stay in your vault
+
+Tasks, events, and projects are Markdown files you can open and edit normally. Daylight runs locally without a separate account or server. Light and dark themes, desktop layouts, and a stacked task board on phones are supported.
+
+## Install
+
+Daylight requires **Obsidian 1.8.7 or later**. Manual installation is currently supported; community plugin listing is being prepared.
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/Gonsix/daylight/releases).
+2. Create `.obsidian/plugins/daylight/` inside your vault and place the three files there.
+3. Restart Obsidian, then enable **Daylight** in **Settings → Community plugins**.
+
+For the current source version or local development, see [Build from source](#build-from-source).
+
+## Your first day with Daylight
+
+1. **Open your dashboard.** Use the calendar-clock ribbon icon or run **Daylight: Open Daylight** from the command palette.
+2. **Add something to do.** Use **＋** in the task section. Choose a date, project, and optional scheduled time or deadline.
+3. **Make room for it.** Select a range on the timeline to add an event.
+4. **Work and review.** Start a task, pause for a break, and finish it when done. Check the work sessions and your completed cards.
+
+On first use, Daylight prepares its folders and note templates. The default location is `Daylight/`. You can change it from **Settings → Daylight → Daylight folder location**; saving moves the existing Daylight folders together.
+
+To use Daylight as your starting view, turn on **Open Daylight on startup**. Existing notes remain open. Another startup plugin or Obsidian's own startup-note setting can still open a note before Daylight appears.
+
+## Choose your language
+
+Open **Settings → Daylight → Language**. English is the default, and changing the interface language keeps your note content and filenames intact.
+
+| Language | Shown in settings |
+| :--- | :--- |
+| English | English |
+| Japanese | 日本語 |
+| Simplified Chinese | 简体中文 |
+| Traditional Chinese | 繁體中文 |
+| Spanish | Español |
+| German | Deutsch |
+| French | Français |
+| Korean | 한국어 |
+| Brazilian Portuguese | Português (Brasil) |
+
+This README is available in [Japanese](README.ja.md), too. README language links and the plugin's language setting are separate.
+
+## Put Daylight inside a note
+
+Add this code block to a note to show today's dashboard in Reading view or Live Preview:
 
 ````markdown
 ```daylight
@@ -62,127 +108,21 @@ date: today
 ```
 ````
 
-固定した日を指定する場合:
+For a specific day, use a quoted date such as `date: "2026-11-13"`.
 
-````markdown
-```daylight
-date: "2026-11-06"
-```
-````
+If you omit `date`, notes in `daily_notes/01_daily/YYYY-MM-DD.md` use the date in their filename; other notes show today. The older `vault-dashboard` code block is also supported.
 
-## カンバンビュー
+## Useful to know
 
-各状態列のカード末尾にマウスを近づけると「＋ 追加」が表示され、その列の状態を初期選択したタスク作成モーダルを開きます。選択日・プロジェクトの絞り込みを引き継ぎます。タッチ端末ではボタンを常時表示し、キーボードフォーカス時にも表示します。
+- **Dates use your device's local time zone.** A scheduled date and a deadline are separate fields.
+- **Notes save when you submit.** Unsaved note drafts stay while switching items in the same view, but are lost when that view closes.
+- **Deleting removes the source note.** Daylight uses Obsidian's trash behavior. Deleting a project does not delete its tasks or events.
+- **Keep a backup before getting started.** Daylight edits the notes stored in your vault.
+- **Current limits:** Google Calendar sync and dragging an existing event to reschedule it are not included. Open the event form to change its time.
 
-スマートフォンでは状態ごとの列を縦に並べ、各列を画面幅いっぱいに表示します。iPadなどのタブレット・デスクトップでは横並びを維持します。判定にはObsidianの `Platform.isPhone` を使い、タイムライン・プロジェクト一覧の配置は変更しません。
+## Build from source
 
-タスク欄は常にカンバン形式で表示します。有効化設定・表示形式の切り替え・旧リスト画面はありません。旧バージョンの有効化設定は読み込み時に取り除きます。
-
-通常は未着手・進行中・完了の3列を表示します。「保留・中止を表示」で残りの列を開けます。カードを列へドラッグ、またはカード内の状態メニューから移動すると、元ノートのstatusと完了日時を更新します。カード名のクリックで既存の詳細を開きます。日付・表示範囲・プロジェクトの絞り込みを引き継ぎ、選択日には持ち越しタスクとその日に完了したタスクも含みます。列が収まらない場合は横にスクロールできます。
-
-## タスクの並び替え
-
-カンバンの同じ状態列でタスクをドラッグし、手動で順番を変更できます。値が小さいタスクほど上に表示します。この順番は、重要度を表す段階ではなく、状態列ごとの手動の並び順です。
-
-### 操作方法
-
-- ドラッグ中のカードは薄く表示し、挿入先にはカードと同じ高さの枠を表示します。挿入位置が変わると周囲のカードが動きます。
-- 同じ状態列のカードの上端・下端にドロップすると、その前後に移動します。カード中央へのドロップは、そのカードを親タスクにする操作です。
-- 別の状態列へ移動すると、その列の末尾に追加されます。状態メニューや開始・終了ボタンで状態を変更した場合も、移動先の末尾に追加されます。
-
-### 表示の切り替えと順序
-
-順序は「今日」「すべて」やプロジェクト別に分けず、同じ状態の全タスクで共通です。絞り込み中も、持ち越しを含む表示対象のタスクを共通の順序で表示します。
-
-フィルター中の並べ替えでは、表示されていないタスクも含めて挿入先を決めます。表示中の2枚の間に移した場合は、直後に見えるタスクの全体順序上の直前に挿入します。表示中の最後に移した場合は、そのカードの全体順序上の直後に挿入します。
-
-### 保存と採番
-
-タスクノートのフロントマターに、整数の `sort_order` を保存します。
-
-```yaml
-status: todo
-sort_order: 10000
-```
-
-設定 → Daylight →「ソートオーダーの間隔」で、採番の間隔を変更できます。初期値は `10000` で、1以上の整数を指定します。設定を変えても既存の値は書き換えず、以降の採番に適用します。
-
-- **新規作成・状態変更**：移動先の列の末尾の値に、設定した間隔を足します。空の列では間隔の値から始めます。
-- **同じ列の先頭**：先頭のタスクの値から間隔を引きます。結果が負の数になることもあります。
-- **タスクの間**：前後の値の整数の中間を使います。例えば `10000` と `20000` の間は `15000` です。
-- **同じ列の末尾**：末尾のタスクの値に間隔を足します。
-
-通常の並べ替えでは移動したタスクの値を更新します。既存タスクに順序が未設定の場合は、対象列で初めて並べ替え・タスク作成・状態変更による追加を行う際、未設定のタスクをその列の末尾に現在の並び順で採番します。この初期化では複数ノートを更新します。
-
-前後の値の間に整数がない場合や安全に扱える整数の範囲を超える場合は、並べ替えを中止してメッセージを表示します。周辺タスクの自動振り直しは行いません。値が重複している場合は、予定開始時刻、タイトル、ファイルパスを使って安定した順序で表示します。
-
-## 親子タスク
-
-タスクの三点メニューは「ステータス」「プロジェクト」「親タスク」の順に表示します。ステータスは未着手・進行中・完了・保留・中止の5種類から選択でき、ドラッグと同じ開始・終了時刻の更新を行います。所属プロジェクトの変更・解除もできます。変更するのはそのタスクのprojectのみで、状態・作業時刻・親子関係は維持します。
-
-カンバンの親カード内に、自分を `parent_task` として直接リンクしている子タスクを字下げして表示します。状態は色付きアイコンで表示し、子タスク名を押すと詳細を開きます。見出しは「サブタスク 1/2」のように完了数／全体数を表示し、一覧は折りたためます。子タスク自身のカードは、元の状態列にもそのまま表示します。日付などでカードが絞られていても、親カード内では直接の子を確認できます。孫以降は、その直接の親カード内に表示します。
-
-カードを別のタスクカード上へドロップすると、状態や作業時刻を変えずにドロップ先を親として設定します。列の余白へのドロップは従来どおり状態変更です。三点メニューの「親タスク」または詳細サイドバーの同名プロパティからも設定・解除できます。自分自身や子孫を親にする操作は拒否し、同名ノートはフルパスのWikiリンクで区別します。
-
-## タスクの開始・終了
-
-カンバンカードの三点メニュー横の再生ボタンで作業を開始します。状態を進行中にし、現在時刻を `task_sessions` と `task_start` に `YYYY-MM-DDTHH:mm:ss`（端末のローカル時刻）で保存します。複数タスクの並列実行も可能です。実行中のカードには一時停止ボタン（⏸）と終了ボタン（■）が表示され、一時停止すると進行中のまま現在のセッションを閉じ、再生ボタンから新しいセッションを再開できます。終了ボタンを押すとセッションを閉じ、完了日時を記録して完了へ移動します。カードの予定日は表示せず、進行中・完了・作業履歴のある保留カードには時計アイコンと最初の開始から最後の終了までの時刻（2回目以降は `/ 計2回` を併記、例: `13:09 → --:--` / `09:00 → 14:25 / 計2回`）を表示します。日時が不明な場合は `--:--` とし、ホバーや詳細サイドバーで全セッションを確認できます。実行中セッションの経過時間は表示せず、終了済みセッションの合計作業時間を `01:25` のような時間:分で表示します（秒は切り捨て、24時間を超えても累積時間で表示）。
-
-実績は予定の `schedule_start` / `schedule_end` と別に保存します。開始だけでもタイムラインに色付きの実績枠をセッションごとに表示し、実行中の枠は30秒ごとの画面更新で現在時刻まで伸ばします。終了後は保存された終了時刻で固定します。日またぎにも対応し、予定枠は保持します。実績時刻や `task_sessions` は詳細サイドバーから編集できます。
-
-ドラッグなどで未着手へ戻すと `task_start`・`task_end`・`task_sessions` を空にし、実績枠を消します。進行中へ移動すると新しいセッションを開始し、最初の開始（`task_start`）は保持したまま `task_end` を空にして新しい実績枠を伸ばします。完了・保留・中止へ移動すると実行中のセッションを閉じ、完了時は `completed at` を記録します。開始せず直接完了へ移動した場合も終了を記録し、不明な開始時刻は推測しません。予定時刻は変更しません。
-
-三点メニューのステータスからも5種類の状態へ変更できます。進行中の一時停止でも、保留・中止を経由した再開でも、休止中の時間は作業時間に含まれず、各セッションの実作業時間だけを合算します。
-
-## 表示・編集
-
-- 詳細サイドバーの赤文字「削除」からタスク・プロジェクトの削除確認を開けます。タスクはプロパティの保存の横、プロジェクトはメモ追加の横に表示します。「削除する」で元ノートをObsidianのゴミ箱へ移し、所属するタスク・予定などは削除しません。確認後にノートが更新された場合は削除を拒否します。
-
-- タスク欄・プロジェクト欄の右上の＋から、それぞれ追加モーダルを開けます。作成ボタンまたは `⌘ Enter` で保存し、キャンセルではノートを作りません。
-- タスクはタイトル、状態、予定日、開始・終了、締切、プロジェクト、親タスク、メモを入力できます。予定日は画面の選択日を初期値とし、「予定日未定」タブからは空欄にします。プロジェクトで絞り込み中は、そのプロジェクトを初期選択します。予定日を空欄にするとファイル名はTBDになり、締切を予定日から推測しません。
-- プロジェクトはタイトル、状態、親プロジェクト、作業場所、ゴール、メモを入力できます。ゴールはテンプレートの「ゴール」見出しに追加します。作業場所のフォルダは作成しません。
-- 作成時に `Daylight/Templates/Task.md` / `Daylight/Templates/Project.md` を読み、既存の属性・本文構成を維持して それぞれ `Daylight/Tasks/`・`Daylight/Projects/` に保存します。同名は連番とし、既存ノートを上書きしません。未対応のTemplater式や削除済みの参照先はエラーにします。
-
-- 予定の追加・編集ダイアログ、タスクのプロパティ編集、詳細欄のメモ追記では、入力欄にフォーカスした状態で`⌘ Enter`（Return）を押すと、そのフォームの「作成／保存／追加」を実行します。通常のEnterは改行に使え、日本語変換中・保存中・削除確認中には実行しません。
-- 上部の日付をクリックすると月カレンダーが開きます。任意の日付を選択でき、月・年の直接変更、「昨日・今日・明日」への移動も可能です。日付下の点はタスク・予定の件数（最大3点）です。矢印キー・PageUp/Downでも移動でき、Escape・外側のクリックで閉じます。
-- タイムラインの空白をドラッグすると30分刻みの範囲を選べます。青い左上／右下ハンドルで開始／終了を調整し、中央をドラッグすると長さを固定したまま移動します。ハンドルは矢印キーでも30分ずつ調整できます。Escape・×で選択を破棄します。タッチでは空白のタップで範囲を作り、ハンドルや中央をドラッグします。
-- 範囲の「予定を追加」またはタイムライン上部の＋から作成モーダルを開きます。タイトル、開始・終了（1分単位）、プロジェクト、状態、メモを指定し、「作成」で保存します。日またぎも可能です。キャンセルはノートを作りません。
-- 範囲選択・調整を終えた直後は、Enter（Return）だけでも予定追加モーダルへ進めます。日本語変換中、ドラッグ中、他の入力欄でのEnterには反応しません。
-- 登録済みの予定は、時間ブロックや一覧をクリックすると編集モーダルを開きます。タイトル、日時、プロジェクト、状態を変更でき、既存メモを確認して追記できます。「保存」で反映します。モーダルを開いてから別の編集があった場合は保存・削除を拒否し、開き直すよう案内します。
-- 編集モーダルの「削除」→「削除する」で、予定ノートをObsidian設定に従うゴミ箱へ移します。予定を隠すだけではなく、元ノートを対象とします。
-- タイトルや開始日を変更した場合は`FileManager.renameFile`でノート名も同期します。同名ファイルは上書きせず連番にします。内部リンクの更新はObsidian設定に従います（このVaultでは自動更新が有効）。名前変更が失敗した場合、他の編集が加わっていなければ保存前の内容へ戻します。
-- 新規予定はその時点の`Daylight/Templates/Event.md`から`Daylight/Events/予定名 YYYY-MM-DD.md`へ保存します。日付は開始日に合わせ、同名は連番にします。既存ノート・テンプレートは上書きしません。未対応のTemplater式がテンプレートにある場合は実行せずエラーを表示します。
-- 読み取り対象: 設定したDaylightフォルダ内の `Tasks/`・`Events/`・`Projects/` 配下のMarkdown。タグ`task`・`event`・`project`で識別します。複数種類のタグがあるノートは曖昧なため表示対象から外します。
-- 日付と時刻は端末のローカルタイムゾーン基準。`target_date`は実行予定日、`due`は締切として別表示します。
-- 今日のタイムラインは読み込み時、現在時刻の赤線が表示領域の中央に来る位置へスクロールします。0時・24時付近ではスクロール可能な端で止まります。隠れた状態で読み込まれたビューは表示可能になってから位置を合わせ、手動スクロール中に自動で戻しません。
-- `schedule_start`と`schedule_end`が両方あり、終了が開始より後であれば、タスクも予定もタイムラインに表示します。日またぎ・時間の重複に対応します。
-- タスクの表示範囲は選択日・進行中・予定日未定・すべて。既定は選択日。「すべて」には完了・中止や完了日時不明のタスクも表示します。
-- タイムラインは完了・保留・中止も非表示にせず、状態色だけを変えて表示し続けます。
-- 選択日のカンバンには持ち越しタスクと、その日に完了したタスクも表示します。完了タスクの対象は`status: done`かつ`completed at`の日付が選択日と一致するタスクです。予定日ではなく、実際の完了日で集計します。
-- ダッシュボードの状態選択・サイドバーからタスクを未完了→完了へ変更すると、端末のローカル実時刻を`completed at`へ記録します。完了の取り消しで空にし、再完了時はその時点の日時を記録します。すでに完了済みで日時が不明なタスクの日時は推測しません。必要ならサイドバーの「完了日時」から入力できます。
-- 過去の未着手・進行中のタスク／予定は「持ち越し」に表示します。日付や状態を自動変更しません。
-- 日時が不完全な当日の予定／時間指定タスクは「日時の確認」に表示します。
-- プロジェクトは未完了・未中止・非アーカイブを表示。件数は直接の`project`リンクで所属する未完了タスク数です。カードの名前をクリックすると表示対象を絞ります。
-- 5種類の状態は、日本語表示の選択メニューから変更できます。元ノートの`status`のみ更新します。
-- タスクの行・時間ブロックやプロジェクトの詳細ボタンをクリックすると詳細が開きます。メモは`## Notes`へ日時付きで追記します。見出しがなければ末尾に追加し、既存のテンプレート見出しは保持します。
-- タスクの詳細サイドバーでは「プロパティ」から状態、予定日、開始・終了、締切、プロジェクト、親タスクを編集し「保存」で反映します。作成日、更新日時、タグ、別名、その他の既存プロパティも省略せず表示します。任意のプロパティを追加することもできます。
-- 文字列、数値、チェック、日付、日時、文字列リストに対応します。オブジェクトや型の混ざったリストはYAML入力で編集し、保存時に解析します。空欄・0・falseを区別し、タスクのタグには`task`を維持します。
-- 予定日を変更した場合はファイル名の日付も同期し、予定日を空にすると`TBD`を使います。同名は連番で回避します。開始・終了や締切から予定日を勝手に推測しません。
-- プロパティ編集中に加わったメモや、変更対象以外のプロパティ更新は保存時に維持します。同じプロパティが外部で変更された場合は上書きせずエラーを表示します。未編集中のプロパティはノートの更新に合わせて自動で反映します。競合時は詳細を開き直してください。
-- 未送信のメモは同じ画面内で項目を切り替えても残ります。ビューを閉じる・アプリを終了すると失われるため、必要な内容は「追加」で保存してください。
-- ノート削除・名前変更・外部編集はイベント経由で反映します。競合する状態変更は上書きせずエラーを表示します。
-
-タイムライン上の既存予定のドラッグによる日時変更と、Googleカレンダー同期はこの版には含みません。
-
-## 開発
-
-ソースは`src/`、配布ファイルは`main.js`・`manifest.json`・`styles.css`です。
-
-起動、データ保存、タスク、タイムラインなどの内部処理は[機能仕様](docs/specs/README.md)を参照してください。
-
-### Vault外で開発してビルド・インストール
-
-Node.jsとnpm、Bash（macOS・Linux・WindowsのGit Bashなど）が必要です。リポジトリはVault外の任意の開発用フォルダにクローンできます。
+With Git, Node.js, npm, and Bash installed:
 
 ```sh
 git clone https://github.com/Gonsix/daylight.git
@@ -190,20 +130,10 @@ cd daylight
 ./install.sh "/path/to/My Vault"
 ```
 
-この1コマンドで、初回は依存関係を `npm ci --include=dev` でインストールしてからビルドし、指定したVaultの `.obsidian/plugins/daylight/` へ `main.js`・`manifest.json`・`styles.css` の3ファイルを配置します。Vaultには事前にObsidianで開いた際の `.obsidian` フォルダが必要です。スペースを含むパスは引用符で囲んでください。
+The script installs dependencies if needed, builds the plugin, and copies its three distribution files into the vault. Existing plugin settings are preserved. Reload Daylight in Obsidian after updating.
 
-コード変更後も同じコマンドで更新できます。`data.json` などの既存設定、タスク・予定・プロジェクトのノートは変更しません。ソース・`node_modules` はコピーしません。ビルドが失敗した場合は配置しません。依存関係の変更を取り込んだときは `npm ci --include=dev` を再実行してください。
-
-毎回パスを指定したくない場合は、開発用シェルで環境変数を設定できます。
-
-```sh
-export DAYLIGHT_VAULT_PATH="$HOME/path/to/My Vault"
-./install.sh
-```
-
-`npm run build:install -- "/path/to/My Vault"` でも実行できます。配置後はObsidianのコミュニティプラグイン設定でDaylightを有効にしてください。既に有効な場合はオフ→オンで再読み込みします。このコマンドはObsidianの有効化設定を変更しません。
-
-### チェックとビルド
+<details>
+<summary>Development commands and technical documentation</summary>
 
 ```sh
 npm ci
@@ -212,12 +142,16 @@ npm test
 npm run build
 ```
 
-実行時の外部通信・ローカルサーバーは不要です。Reactも配布ファイルへバンドルしています。テストは`node --import tsx`で実行し、tsx CLIのIPCソケットを使用しません。
+See the [feature specifications](docs/specs/README.md) for storage, startup, task execution, and localization details. The specifications are currently written in Japanese.
 
-CSSは`.daylight-app`と`.daylight-host`内に限定し、ライト／ダークテーマと狭い埋め込み領域に対応します。フラットな表面、細い区切り、控えめな状態色を基本としています。
+</details>
 
-状態色: todo `#94A3B8`、on_going `#22D3EE`、done `#34D399`、on_hold `#FBBF24`、cancelled `#FB7185`。
+## Feedback
 
-## 検証範囲
+Found a problem or have an idea? [Open an issue](https://github.com/Gonsix/daylight/issues). For bugs, include your Daylight and Obsidian versions, device, interface language, and steps to reproduce the problem.
 
-日付・重複・日またぎ・持ち越し・メモ追記・状態競合・作業開始終了・React出力の自動テストを実施しています。Obsidian CLIで読み込み、描画、設定反映、モーダル開閉を確認しています。開始・終了の画面操作は実ノートを変更しない検証用データで確認しました。Hearth内のレイアウトは未検証です。
+## License
+
+Copyright © 2026 Gonsix. Daylight is released under the [MIT License](LICENSE).
+
+Third-party dependencies and Obsidian branding retain their respective licenses and terms. Daylight is an independent community project and is not affiliated with or endorsed by Obsidian.
