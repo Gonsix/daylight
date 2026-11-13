@@ -409,6 +409,26 @@ test('creating in an ongoing column initializes the same actual start as startin
   const done=await store.createTask({...taskInput,status:'done'});assert.ok(fm.get(done.path).task_end);assert.ok(fm.get(done.path)['completed at']);
 });
 
+test('play/pause/resume/finish supports multi-session and parallel running tasks', async()=>{
+  const {store,task,app,fm}=await fixture();
+  const second=await app.vault.create('Daylight/Tasks/Second TBD.md',`---\n${JSON.stringify({tags:['task'],status:'todo'})}\n---\n\n## Notes\n`);
+  store.invalidate();
+  const row=(path=task.path)=>store.items().find((i:any)=>i.path===path);
+  await store.startTask(row());
+  await store.startTask(row(second.path));
+  assert.equal(row().status,'on_going');assert.equal(row(second.path).status,'on_going');
+  await store.pauseTask(row());
+  const paused=fm.get(task.path);
+  assert.equal(paused.status,'on_going');assert.equal(paused.task_sessions.length,1);assert.ok(paused.task_end);assert.equal(paused['completed at'],null);
+  await store.startTask(row());
+  const resumed=fm.get(task.path);
+  assert.equal(resumed.status,'on_going');assert.equal(resumed.task_sessions.length,2);assert.equal(resumed.task_start,paused.task_start);assert.equal(resumed.task_end,null);
+  await store.pauseTask(row());
+  await store.finishTask(row());
+  const done=fm.get(task.path);
+  assert.equal(done.status,'done');assert.equal(done.task_sessions.length,2);assert.ok(done.task_end);assert.ok(done['completed at']);
+});
+
 test('custom root routes reading, creating and date-based renaming to the configured kind folders',async()=>{
   const {store:original,files,templates,fm,bodies,app}=await fixture();
   for(const file of [...files,...templates]) {

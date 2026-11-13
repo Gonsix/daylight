@@ -11,7 +11,7 @@ import { openDeleteNoteModal } from './DeleteNoteModal';
 import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
 import { submitOnCommandEnter } from './shortcuts';
-import { centeredScrollTop, dayKey, dayStart, hasSchedule, isActive, isStatus, Item, moveDay, STATUS, TaskTab, timeline, timeLabel } from './model';
+import { centeredScrollTop, dayKey, dayStart, formatDuration, hasSchedule, isActive, isStatus, Item, itemSessions, moveDay, STATUS, TaskTab, timeline, timeLabel } from './model';
 
 function Icon({ name, size = 16 }: { name: string; size?: number }) {
   const paths: Record<string, React.ReactNode> = {
@@ -75,7 +75,7 @@ function Timeline({ items, day, now, store, onSelect, projectPath }: { items: It
         {Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i).map(hour =>
           <div className="daylight-hour" key={hour} style={{ top: (hour - firstHour) * 60 }}><time>{String(hour).padStart(2, '0')}:00</time><span /></div>)}
         <TimeSelection key={day} day={day} scroller={scroller} onConfirm={range => openEventModal(store,range,projectPath)}>
-          {slots.map(slot => <article key={`${slot.item.path}:${slot.source}`} className={`daylight-slot daylight-slot-${slot.item.kind}${slot.source === 'actual' ? ' daylight-slot-actual' : ''}${slot.running ? ' is-running' : ''}`} style={{
+          {slots.map((slot, idx) => <article key={`${slot.item.path}:${slot.source}:${slot.from}:${idx}`} className={`daylight-slot daylight-slot-${slot.item.kind}${slot.source === 'actual' ? ' daylight-slot-actual' : ''}${slot.running ? ' is-running' : ''}`} style={{
             ...stateColor(slot.item), top: slot.start - start, height: Math.min(total - (slot.start - start), Math.max(slot.source === 'actual' ? 2 : 26, slot.end - slot.start)),
             left: `${slot.column * 100 / slot.columns}%`, width: `calc(${100 / slot.columns}% - 5px)`,
           }} title={`${slot.item.title} · ${slot.source === 'actual' ? '実績' : '予定'} ${timeLabel(slot.from)}–${slot.running ? '実行中' : timeLabel(slot.to)}${slot.item.projectLabel ? ' · ' + slot.item.projectLabel : ''}`} onClick={e => {
@@ -125,6 +125,13 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
       {item.due !== null && <><dt>締切</dt><dd>{dayKey(item.due)} {timeLabel(item.due)}</dd></>}
     </dl>
     </>}
+    {item.kind === 'task' && itemSessions(item).length > 0 && <div className="daylight-work-sessions">
+      <h3>作業セッション</h3>
+      <ul>{itemSessions(item).map((s, idx) => <li key={`${s.start}-${idx}`}>
+        <span>{dayKey(s.start)} {timeLabel(s.start)} → {s.end != null ? `${dayKey(s.end) === dayKey(s.start) ? '' : `${dayKey(s.end)} `}${timeLabel(s.end)}` : '--:--'}</span>
+        {s.end != null && s.end >= s.start && <small>{formatDuration((s.end - s.start) / 60000)}</small>}
+      </li>)}</ul>
+    </div>}
     {workDuration(item) && <p className="daylight-work-duration">作業時間 {workDuration(item)}</p>}
     <h3>メモ</h3>
     {notes && <div className="daylight-notes">{notes}</div>}

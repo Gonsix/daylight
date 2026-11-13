@@ -42,9 +42,16 @@ test('property controls reflect both registered types and the actual value witho
 
 test('actual work timestamps use datetime controls and reject reversed or missing starts',()=>{
   assert.equal(propertyType('task_start',null),'datetime');assert.equal(propertyType('task_end',null),'datetime');
+  assert.equal(propertyType('task_sessions',null),'list');
   const valid=mergeTaskProperties(content(),snapshot,{task_start:'2026-11-09T09:00',task_end:'2026-11-09T10:25'},yaml);
   assert.equal(valid.properties.task_start,'2026-11-09T09:00:00');assert.equal(valid.properties.task_end,'2026-11-09T10:25:00');
   assert.equal(valid.properties.schedule_start,null);
   assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_end:'2026-11-09T10:00'},yaml),/作業開始/);
   assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_start:'2026-11-09T11:00',task_end:'2026-11-09T10:00'},yaml),/作業開始/);
+  const sessions=mergeTaskProperties(content(),snapshot,{task_sessions:['2026-11-09T09:00..2026-11-09T09:30','2026-11-09T13:30..']},yaml);
+  assert.deepEqual(sessions.properties.task_sessions,['2026-11-09T09:00:00..2026-11-09T09:30:00','2026-11-09T13:30:00..']);
+  assert.equal(sessions.properties.task_start,'2026-11-09T09:00:00');
+  assert.equal(sessions.properties.task_end,null);
+  assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_sessions:['2026-11-09T10:00..2026-11-09T09:00']},yaml),/作業開始/);
+  assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_sessions:['2026-11-09T09:00..','2026-11-09T13:00..']},yaml),/終了日時/);
 });

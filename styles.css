@@ -230,10 +230,18 @@
 .daylight-app .daylight-detail-delete { padding: 6px 12px; border: 1px solid var(--daylight-border); border-radius: 5px; background: transparent; color: var(--text-error, #e89b96); }
 .daylight-delete-hint { margin-top: 10px !important; color: var(--daylight-muted); font-size: 12px; }
 
-.daylight-app .daylight-kanban-run-button { display: inline-flex; align-items: center; justify-content: center; margin-left: auto; padding: 4px; border: 0; border-radius: 4px; background: transparent; color: #3fb950; flex-shrink: 0; }
-.daylight-app .daylight-kanban-run-button.is-running { color: #d29922; }
-.daylight-kanban-run-button + .daylight-kanban-menu-button { margin-left: 0; }
-.daylight-kanban-run-button:hover { background: var(--daylight-raised); }
+.daylight-app .daylight-kanban-action { display: inline-flex; align-items: center; justify-content: center; padding: 4px; border: 0; border-radius: 4px; background: transparent; color: #3fb950; flex-shrink: 0; }
+.daylight-app .daylight-kanban-action:first-of-type { margin-left: auto; }
+.daylight-app .daylight-kanban-pause-button { color: #d29922; }
+.daylight-app .daylight-kanban-run-button.is-running { color: #a371f7; }
+.daylight-kanban-action + .daylight-kanban-menu-button { margin-left: 0; }
+.daylight-kanban-action:hover { background: var(--daylight-raised); }
+.daylight-work-sessions-count { color: var(--daylight-muted); font-size: 11px; white-space: nowrap; }
+.daylight-work-sessions { margin: 16px 0 10px; }
+.daylight-work-sessions h3 { margin: 0 0 8px; }
+.daylight-work-sessions ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.daylight-work-sessions li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--daylight-muted); font-variant-numeric: tabular-nums; }
+.daylight-work-sessions li small { color: var(--daylight-text); font-size: 11px; }
 .daylight-kanban-status-menu { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid var(--daylight-border); }
 .daylight-app .daylight-kanban-status-menu button { padding: 5px 7px; border: 0; border-radius: 4px; background: var(--daylight-bg); color: var(--daylight-muted); text-align: left; font-size: 11px; }
 .daylight-work-duration { font-variant-numeric: tabular-nums; }

@@ -2,9 +2,9 @@ import { App, Plugin, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStorage } from './storage';
 import { orderedTasks, orderBetween } from './order';
 import { EventInput, EventSnapshot, KEEP_PROJECT, eventDocument, renderEvent, updateEventDocument, validateEvent } from './event';
-import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, Kind, notesText, timeLabel, titleFor } from './model';
+import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, itemSessions, Kind, notesText, parseWorkSessions, timeLabel, titleFor, WorkSession } from './model';
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
-import { recordWorkStatus } from './execution';
+import { isFrontmatterRunning, isTaskRunning, pauseWork, recordWorkStatus } from './execution';
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
 
 export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; content: string }
@@ -18,6 +18,7 @@ export class DaylightStore {
   private overrides = new Map<string, { status: string; previous: string }>();
   private cache: Item[] | null = null;
   private orderOverrides = new Map<string, { value: number; previous: unknown }>();
+  private workOverrides = new Map<string, { sessions: WorkSession[]; taskStart: number | null; taskEnd: number | null; valueKey: string; previousKey: string }>();
   sortOrderGap = 10000;
   constructor(public app: App, plugin: Plugin, root = 'Daylight') {
     this.storage = new DaylightStorage(app,root);
@@ -66,7 +67,21 @@ export class DaylightStore {
         projectLabel: target?.[2] || linked?.basename || target?.[1] || project,
         parentTaskPath: parentFile?.path ?? null, parentTaskLabel: parentLink?.[2] || (parentFile ? titleFor(parentFile.basename,'task') : parentLink?.[1]) || parent,
         archived: fm.archived === true,
-        completedAt:dateTime(fm['completed at']), taskStart:dateTime(fm.task_start), taskEnd:dateTime(fm.task_end),
+        ...(() => {
+          const sessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
+          const taskStart = dateTime(fm.task_start) ?? sessions[0]?.start ?? null;
+          const taskEnd = dateTime(fm.task_end) ?? (sessions.length ? sessions[sessions.length - 1].end : null);
+          const rawKey = this.workKey(sessions, taskStart, taskEnd);
+          const workOverride = this.workOverrides.get(file.path);
+          if (workOverride && (rawKey === workOverride.valueKey || rawKey !== workOverride.previousKey)) this.workOverrides.delete(file.path);
+          const active = this.workOverrides.get(file.path);
+          return {
+            completedAt: dateTime(fm['completed at']),
+            taskStart: active ? active.taskStart : taskStart,
+            taskEnd: active ? active.taskEnd : taskEnd,
+            taskSessions: active ? active.sessions : sessions,
+          };
+        })(),
       }];
     });
     return this.cache;
@@ -133,48 +148,90 @@ export class DaylightStore {
       this.invalidate();
     });
   }
+  private workKey(sessions: WorkSession[], taskStart: number | null, taskEnd: number | null): string {
+    return `${taskStart ?? ''}|${taskEnd ?? ''}|${sessions.map(s => `${s.start}..${s.end ?? ''}`).join(',')}`;
+  }
+  private captureWorkOverride(path: string, previousKey: string, fm: Record<string, unknown>) {
+    const sessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
+    const taskStart = dateTime(fm.task_start) ?? sessions[0]?.start ?? null;
+    const taskEnd = dateTime(fm.task_end) ?? (sessions.length ? sessions[sessions.length - 1].end : null);
+    const valueKey = this.workKey(sessions, taskStart, taskEnd);
+    if (valueKey !== previousKey) this.workOverrides.set(path, { sessions, taskStart, taskEnd, valueKey, previousKey });
+  }
   async setStatus(item: Item, status: string) {
     if (!isStatus(status)) throw new Error('状態を選択してください。');
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
       const order = item.kind === 'task' && item.status !== status ? await this.appendOrder(status, item.path) : null;
+      const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
+      let updatedWork: Record<string, unknown> | null = null;
       await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
         if (String(fm.status ?? '').trim() !== item.status) throw new Error('状態が更新されています。再度選択してください。');
         const previous=fm.status;
         fm.status = status;
         if (order !== null) { this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order}); fm.sort_order=order; }
-        if(item.kind==='task')recordWorkStatus(fm,previous);
+        if (item.kind === 'task') { recordWorkStatus(fm, previous); updatedWork = { ...fm }; }
       });
+      if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
       this.overrides.set(item.path, { status, previous: item.status }); this.invalidate();
     }));
   }
   async startTask(item: Item) {
     if (item.kind !== 'task' || item.status === 'done' || item.status === 'cancelled') throw new Error('開始できるタスクを選び直してください。');
+    if (isTaskRunning(item)) throw new Error('すでに開始しています。');
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
       const order = item.status !== 'on_going' ? await this.appendOrder('on_going',item.path) : null;
       const file=this.file(item.path);
+      const expectedSessions = itemSessions(item);
+      const previousKey = this.workKey(expectedSessions, item.taskStart ?? null, item.taskEnd ?? null);
+      let updatedWork: Record<string, unknown> | null = null;
       await this.app.vault.process(file, content => {
         const yaml={parse:parseYaml,stringify:stringifyYaml};
         const {fm,body,newline}=taskDocument(content,yaml);
-        if (fm.status !== item.status || dateTime(fm.task_start) !== (item.taskStart ?? null) || dateTime(fm.task_end) !== (item.taskEnd ?? null)) throw new Error('タスクが更新されています。開き直してください。');
-        if (fm.status === 'on_going' && dateTime(fm.task_start) !== null && !fm.task_end) throw new Error('すでに開始しています。');
+        const currentSessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
+        if (fm.status !== item.status || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error('タスクが更新されています。開き直してください。');
+        if (fm.status === 'on_going' && isFrontmatterRunning(fm)) throw new Error('すでに開始しています。');
         const now=Date.now();
         const previous=fm.status;
         fm.status='on_going';if(order !== null){this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order});fm.sort_order=order;}recordWorkStatus(fm,previous,now);fm['completed at']=null;
+        updatedWork = { ...fm };
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
       });
+      if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
       this.overrides.set(item.path,{status:'on_going',previous:item.status});this.invalidate();
     }));
   }
-  async finishTask(item: Item) {
-    if (item.kind !== 'task' || item.status !== 'on_going' || item.taskStart == null || item.taskEnd != null) throw new Error('実行中のタスクを選び直してください。');
+  async pauseTask(item: Item) {
+    if (item.kind !== 'task' || !isTaskRunning(item)) throw new Error('実行中のタスクを選び直してください。');
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
-      const order = await this.appendOrder('done',item.path);
+      const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
+      let updatedWork: Record<string, unknown> | null = null;
       await this.app.vault.process(this.file(item.path), content => {
         const {fm,body,newline}=taskDocument(content,{parse:parseYaml,stringify:stringifyYaml});
-        if (fm.status !== 'on_going' || dateTime(fm.task_start) !== item.taskStart || dateTime(fm.task_end) !== null) throw new Error('タスクが更新されています。開き直してください。');
-        fm.status='done';this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order});fm.sort_order=order;recordWorkStatus(fm,'on_going');
+        const currentSessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
+        if (fm.status !== 'on_going' || !isFrontmatterRunning(fm) || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error('タスクが更新されています。開き直してください。');
+        pauseWork(fm, Date.now());
+        updatedWork = { ...fm };
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
       });
+      if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
+      this.invalidate();
+    }));
+  }
+  async finishTask(item: Item) {
+    if (item.kind !== 'task' || item.status !== 'on_going') throw new Error('実行中のタスクを選び直してください。');
+    await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
+      const order = await this.appendOrder('done',item.path);
+      const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
+      let updatedWork: Record<string, unknown> | null = null;
+      await this.app.vault.process(this.file(item.path), content => {
+        const {fm,body,newline}=taskDocument(content,{parse:parseYaml,stringify:stringifyYaml});
+        const currentSessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
+        if (fm.status !== 'on_going' || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error('タスクが更新されています。開き直してください。');
+        fm.status='done';this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order});fm.sort_order=order;recordWorkStatus(fm,'on_going');
+        updatedWork = { ...fm };
+        return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
+      });
+      if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
       this.overrides.set(item.path,{status:'done',previous:item.status});this.invalidate();
     }));
   }
@@ -298,7 +355,7 @@ export class DaylightStore {
         } else {this.invalidate();throw new Error('名前変更後の処理を完了できませんでした。ノートを開き直してください。');}
         this.invalidate();throw error;
       }
-      this.overrides.delete(snapshot.path);this.invalidate();result=file;
+      this.overrides.delete(snapshot.path);this.workOverrides.delete(snapshot.path);this.invalidate();result=file;
     }));
     return result!;
   }

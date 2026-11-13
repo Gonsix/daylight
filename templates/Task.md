@@ -11,6 +11,7 @@ schedule_start:
 schedule_end:
 task_start:
 task_end:
+task_sessions:
 project:
 parent_task:
 <% "---" %>

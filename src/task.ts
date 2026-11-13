@@ -1,14 +1,14 @@
-import { dateTime, dayKey, isStatus, timeLabel, validDay } from './model';
-import { recordWorkStatus } from './execution';
+import { dateTime, dayKey, isStatus, localTimestamp, parseWorkSessions, timeLabel, validDay, WorkSession } from './model';
+import { recordWorkStatus, serializeWorkSessions, syncWorkFields } from './execution';
 import { YamlAdapter } from './event';
 
 export interface TaskSnapshot { path: string; properties: Record<string, unknown>; types: Record<string,string>; }
 export type PropertyChanges = Record<string, unknown>;
-export const TASK_FIELDS = ['status','completed at','target_date','schedule_start','schedule_end','task_start','task_end','due','project','parent_task'];
+export const TASK_FIELDS = ['status','completed at','target_date','schedule_start','schedule_end','task_start','task_end','task_sessions','due','project','parent_task'];
 export const PROPERTY_LABELS: Record<string,string> = {
   status:'状態',target_date:'予定日',schedule_start:'開始',schedule_end:'終了',due:'締切',project:'プロジェクト',parent_task:'親タスク',
   tags:'タグ',aliases:'別名','created at':'作成日','last updated':'更新日時',
-  'completed at':'完了日時', task_start:'作業開始', task_end:'作業終了',
+  'completed at':'完了日時', task_start:'作業開始', task_end:'作業終了', task_sessions:'作業セッション',
 };
 export function taskDocument(content: string, yaml: YamlAdapter) {
   const match=content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
@@ -36,7 +36,7 @@ export function propertyType(key:string,value:unknown,declared=''):string {
   if(['schedule_start','schedule_end','task_start','task_end','due','last updated','completed at'].includes(key))type='datetime';
   if(key==='target_date')type='date';
   if(key==='created at')type=typeof value==='string'&&value.includes('T')?'datetime':'date';
-  if(['tags','aliases'].includes(key)||['tags','aliases','multitext'].includes(type))return 'list';
+  if(['tags','aliases','task_sessions'].includes(key)||['tags','aliases','multitext'].includes(type))return 'list';
   if(type==='checkbox')return 'boolean';
   if(['yaml','list','boolean'].includes(type))return type;
   if(type==='date')return !value || (typeof value==='string' && validDay(value)) || value instanceof Date?'date':'text';
@@ -70,9 +70,54 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
     const start=dateTime(next.schedule_start),end=dateTime(next.schedule_end);
     if(start!==null&&end!==null&&end<=start)throw new Error('終了日時は開始日時より後にしてください。');
   }
-  if (keys.some(k => ['task_start','task_end'].includes(k))) {
+  if (keys.includes('task_sessions')) {
+    const raw = next.task_sessions;
+    if (raw === null || raw === undefined || (Array.isArray(raw) && raw.length === 0)) {
+      next.task_sessions = null;
+      if (!keys.includes('task_start')) next.task_start = null;
+      if (!keys.includes('task_end')) next.task_end = null;
+    } else {
+      if (!Array.isArray(raw)) throw new Error('作業セッションはリスト形式で入力してください。');
+      const parsed: WorkSession[] = [];
+      for (const entry of raw) {
+        if (typeof entry !== 'string') throw new Error('作業セッションは「開始..終了」の形式で入力してください。');
+        const parts = entry.split('..');
+        if (parts.length !== 2) throw new Error('作業セッションは「開始..終了」の形式で入力してください。');
+        const start = dateTime(parts[0].trim());
+        if (start === null) throw new Error('作業セッションの開始日時を確認してください。');
+        const rawEnd = parts[1].trim();
+        if (!rawEnd) { parsed.push({ start, end: null }); continue; }
+        const end = dateTime(rawEnd);
+        if (end === null) throw new Error('作業セッションの終了日時を確認してください。');
+        if (end < start) throw new Error('作業終了は作業開始以降の日時にしてください。');
+        parsed.push({ start, end });
+      }
+      if (parsed.slice(0, -1).some(s => s.end === null)) throw new Error('途中の作業セッションには終了日時が必要です。');
+      next.task_sessions = serializeWorkSessions(parsed);
+      if (!keys.includes('task_start')) next.task_start = localTimestamp(parsed[0].start);
+      if (!keys.includes('task_end')) {
+        const last = parsed[parsed.length - 1];
+        next.task_end = last.end != null ? localTimestamp(last.end) : null;
+      }
+    }
+  } else if (keys.some(k => ['task_start','task_end'].includes(k))) {
     const start=dateTime(next.task_start),end=dateTime(next.task_end);
     if(end!==null&&(start===null||end<start))throw new Error('作業終了は作業開始以降の日時にしてください。');
+    if (start === null && end === null) {
+      if (Object.hasOwn(next, 'task_sessions')) next.task_sessions = null;
+    } else if (start !== null) {
+      const existing = parseWorkSessions(next.task_sessions, fm.task_start, fm.task_end);
+      if (existing.length <= 1) {
+        if (Object.hasOwn(next, 'task_sessions') || existing.length === 1) syncWorkFields(next, [{ start, end }]);
+      } else {
+        existing[0].start = start;
+        if (existing[0].end !== null && existing[0].end < start) throw new Error('作業終了は作業開始以降の日時にしてください。');
+        const last = existing[existing.length - 1];
+        last.end = end;
+        if (end !== null && end < last.start) throw new Error('作業終了は作業開始以降の日時にしてください。');
+        syncWorkFields(next, existing);
+      }
+    }
   }
   if(keys.includes('status'))recordWorkStatus(next,fm.status);
   const header=yaml.stringify(next).trimEnd().replace(/\r?\n/g,newline);

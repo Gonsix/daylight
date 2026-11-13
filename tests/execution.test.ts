@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isTaskRunning, recordWorkStatus, workDuration } from '../src/execution';
+import { isTaskRunning, pauseWork, recordWorkStatus, workDuration } from '../src/execution';
 import { dateTime, filterTasks, Item, timeline } from '../src/model';
 const item=(patch:Partial<Item>={}):Item=>({path:'notes/Task TBD.md',title:'Task',kind:'task',status:'on_going',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false,taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:null,...patch});
 test('running tasks appear without a scheduled end and grow only to the supplied current time',()=>{
@@ -31,8 +31,8 @@ test('hold/cancel/done stop an open work block while only done records completio
     recordWorkStatus(fm,'on_going',now);
     assert.equal(fm.task_end,'2026-11-09T10:00:00');assert.equal(!!fm['completed at'],status==='done');
   }
-  const old={status:'done',task_start:'2026-11-09T09:00:00',task_end:'2026-11-09T09:30:00'};
-  recordWorkStatus(old,'on_hold',now);assert.equal(old.task_end,'2026-11-09T10:00:00');
+  const old:Record<string,unknown>={status:'done',task_start:'2026-11-09T09:00:00',task_end:'2026-11-09T09:30:00'};
+  recordWorkStatus(old,'on_hold',now);assert.equal(old.task_end,'2026-11-09T09:30:00');assert.equal(old['completed at'],'2026-11-09T10:00:00');
 });
 
 test('todo clears work bounds and ongoing reopens the saved interval',()=>{
@@ -52,4 +52,29 @@ test('drag transitions stamp missing start and current finish without inventing 
   first.status='done';recordWorkStatus(first,'on_going',now+60000);assert.equal(first.task_end,'2026-11-09T10:26:00');assert.equal(first['completed at'],first.task_end);
   const direct:Record<string,unknown>={status:'done'};
   recordWorkStatus(direct,'todo',now);assert.equal(direct.task_end,'2026-11-09T10:25:00');assert.equal(direct.task_start,undefined);
+});
+
+test('multi-session pause stays ongoing, sums duration across sessions, and renders distinct timeline blocks',()=>{
+  const t1=dateTime('2026-11-09T09:00:00')!,t2=dateTime('2026-11-09T09:45:00')!,t3=dateTime('2026-11-09T13:30:00')!,t4=dateTime('2026-11-09T14:25:00')!;
+  const fm:Record<string,unknown>={status:'on_going',task_start:'2026-11-09T09:00:00',task_end:null};
+  pauseWork(fm,t2);
+  assert.equal(fm.status,'on_going');
+  assert.deepEqual(fm.task_sessions,['2026-11-09T09:00:00..2026-11-09T09:45:00']);
+  assert.equal(fm.task_end,'2026-11-09T09:45:00');
+  recordWorkStatus(fm,'on_going',t3);
+  assert.deepEqual(fm.task_sessions,['2026-11-09T09:00:00..2026-11-09T09:45:00','2026-11-09T13:30:00..']);
+  assert.equal(fm.task_start,'2026-11-09T09:00:00');
+  assert.equal(fm.task_end,null);
+  fm.status='done';
+  recordWorkStatus(fm,'on_going',t4);
+  assert.deepEqual(fm.task_sessions,['2026-11-09T09:00:00..2026-11-09T09:45:00','2026-11-09T13:30:00..2026-11-09T14:25:00']);
+  const multi=item({status:'done',taskStart:t1,taskEnd:t4,taskSessions:[{start:t1,end:t2},{start:t3,end:t4}]});
+  assert.equal(workDuration(multi),'01:40');
+  const slots=timeline([multi],'2026-11-09',t4);
+  assert.equal(slots.length,2);
+  assert.equal(slots[0].start,540);assert.equal(slots[0].end,585);
+  assert.equal(slots[1].start,810);assert.equal(slots[1].end,865);
+  const paused=item({status:'on_going',taskStart:t1,taskEnd:t2,taskSessions:[{start:t1,end:t2}]});
+  assert.equal(isTaskRunning(paused),false);
+  assert.equal(workDuration(paused),'00:45');
 });

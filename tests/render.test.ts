@@ -76,6 +76,18 @@ test('kanban exposes play/stop and only completed work has an HH:mm duration',as
   assert.ok(html.includes('aria-label="作業終了">10:25</time>'));
   assert.ok(html.includes('aria-label="作業終了未設定">--:--</span>'));
   assert.equal((html.match(/作業時間/g)||[]).length,1);assert.ok(html.includes('作業時間 01:25'));assert.ok(!html.includes('経過時間'));
+  assert.ok(html.includes('実行中の作業を一時停止'));
+
+  const paused:Item={...base,path:'notes/P.md',title:'中断中',status:'on_going',taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:dateTime('2026-11-09T09:30:00'),taskSessions:[{start:dateTime('2026-11-09T09:00:00')!,end:dateTime('2026-11-09T09:30:00')!}]};
+  const multi:Item={...base,path:'notes/M.md',title:'複数回',status:'done',taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:dateTime('2026-11-09T14:25:00'),taskSessions:[{start:dateTime('2026-11-09T09:00:00')!,end:dateTime('2026-11-09T09:30:00')!},{start:dateTime('2026-11-09T13:30:00')!,end:dateTime('2026-11-09T14:25:00')!}]};
+  const multiHtml=renderToStaticMarkup(React.createElement(module.exports.Kanban,{items:[paused,multi],store:{},onSelect:()=>{}}));
+  assert.ok(multiHtml.includes('中断中の作業を再開'));
+  assert.ok(multiHtml.includes('中断中の作業を終了'));
+  assert.ok(multiHtml.includes('作業時間 00:30'));
+  assert.ok(multiHtml.includes('/ 計2回'));
+  assert.ok(multiHtml.includes('aria-label="作業開始">09:00</time>'));
+  assert.ok(multiHtml.includes('aria-label="作業終了">14:25</time>'));
+  assert.ok(multiHtml.includes('作業時間 01:25'));
 });
 
 test('parent card shows only direct children while child cards stay in their own status columns',async()=>{

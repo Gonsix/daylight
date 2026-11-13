@@ -7,6 +7,7 @@ export const STATUS = {
 } as const;
 export type Status = keyof typeof STATUS;
 export type Kind = 'task' | 'event' | 'project';
+export interface WorkSession { start: number; end: number | null; }
 export interface Item {
   path: string; title: string; kind: Kind; status: string; targetDate: string; sortOrder?: number | null;
   start: number | null; end: number | null; due: number | null;
@@ -14,6 +15,7 @@ export interface Item {
   parentTaskPath?: string | null; parentTaskLabel?: string;
   completedAt?: number | null;
   taskStart?: number | null; taskEnd?: number | null;
+  taskSessions?: WorkSession[];
 }
 export const isStatus = (value: string): value is Status => Object.hasOwn(STATUS, value);
 export const isActive = (item: Item) => !['done', 'cancelled'].includes(item.status);
@@ -87,6 +89,33 @@ export function timeLabel(time: number): string {
 export function localTimestamp(time=Date.now()):string {
   return `${dayKey(time)}T${timeLabel(time)}:${String(new Date(time).getSeconds()).padStart(2,'0')}`;
 }
+export function parseSessionEntry(entry: unknown): WorkSession | null {
+  if (typeof entry !== 'string') return null;
+  const parts = entry.split('..');
+  if (parts.length !== 2) return null;
+  const start = dateTime(parts[0].trim());
+  if (start === null) return null;
+  const rawEnd = parts[1].trim();
+  if (!rawEnd) return { start, end: null };
+  const end = dateTime(rawEnd);
+  if (end === null || end < start) return null;
+  return { start, end };
+}
+export function parseWorkSessions(rawSessions: unknown, rawStart: unknown, rawEnd: unknown): WorkSession[] {
+  if (Array.isArray(rawSessions)) return rawSessions.map(parseSessionEntry).filter((s): s is WorkSession => s !== null);
+  const start = dateTime(rawStart);
+  if (start === null) return [];
+  const end = dateTime(rawEnd);
+  return [{ start, end: end !== null && end >= start ? end : null }];
+}
+export function itemSessions(item: Item): WorkSession[] {
+  if (item.taskSessions) return item.taskSessions;
+  return item.taskStart != null ? [{ start: item.taskStart, end: item.taskEnd ?? null }] : [];
+}
+export function formatDuration(minutes: number): string {
+  const whole = Math.max(0, Math.floor(minutes));
+  return `${String(Math.floor(whole / 60)).padStart(2, '0')}:${String(whole % 60).padStart(2, '0')}`;
+}
 export function recordTaskCompletion(properties:Record<string,unknown>,previousStatus:unknown,now=Date.now()):void {
   if(properties.status==='done'&&previousStatus!=='done')properties['completed at']=localTimestamp(now);
   else if(properties.status!=='done'&&previousStatus==='done')properties['completed at']=null;
@@ -107,10 +136,14 @@ export function timeline(items: Item[], day: string, now = Date.now()): Slot[] {
     if (item.kind === 'project') return [];
     const ranges: {source:'schedule'|'actual';from:number;to:number;running:boolean}[] = [];
     if (hasSchedule(item)) ranges.push({source:'schedule',from:item.start!,to:item.end!,running:false});
-    if (item.kind === 'task' && item.taskStart != null) {
-      const running = item.status === 'on_going' && item.taskEnd == null;
-      const to = item.taskEnd ?? (running ? now : null);
-      if (to !== null && to >= item.taskStart) ranges.push({source:'actual',from:item.taskStart,to,running});
+    if (item.kind === 'task') {
+      const sessions = itemSessions(item);
+      for (let idx = 0; idx < sessions.length; idx++) {
+        const session = sessions[idx];
+        const running = item.status === 'on_going' && session.end == null && idx === sessions.length - 1;
+        const to = session.end ?? (running ? now : null);
+        if (to !== null && to >= session.start) ranges.push({ source: 'actual', from: session.start, to, running });
+      }
     }
     return ranges.filter(r => r.from < end && (r.to > start || (r.running && r.to === start))).map(range => ({
       item,...range,start:Math.max(0,(range.from-start)/60000),end:Math.min(1440,(range.to-start)/60000),column:0,columns:1,
@@ -129,9 +162,12 @@ export function timeline(items: Item[], day: string, now = Date.now()): Slot[] {
   finish(); return slots;
 }
 function hasWorkOnDay(item: Item, day: string): boolean {
-  if (item.taskStart == null) return false;
-  const end = item.taskEnd ?? (item.status === 'on_going' ? Date.now() : item.taskStart);
-  return dayKey(item.taskStart) === day || (item.taskStart < dayStart(moveDay(day, 1)) && end > dayStart(day));
+  const start = dayStart(day), nextStart = dayStart(moveDay(day, 1));
+  return itemSessions(item).some((session, idx, all) => {
+    const running = item.status === 'on_going' && session.end == null && idx === all.length - 1;
+    const end = session.end ?? (running ? Date.now() : session.start);
+    return dayKey(session.start) === day || (session.start < nextStart && end > start);
+  });
 }
 export type TaskTab = 'day' | 'ongoing' | 'unscheduled' | 'all';
 export function filterTasks(items: Item[], day: string, tab: TaskTab): Item[] {
