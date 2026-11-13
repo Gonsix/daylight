@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, parseYaml, stringifyYaml } from 'obsidian';
+import { App, Plugin, TAbstractFile, TFile, TFolder, parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStorage } from './storage';
 import { orderedTasks, orderBetween } from './order';
 import { EventInput, EventSnapshot, KEEP_PROJECT, eventDocument, renderEvent, updateEventDocument, validateEvent } from './event';
@@ -17,6 +17,7 @@ export class DaylightStore {
   private pending = new Map<string, Promise<unknown>>();
   private overrides = new Map<string, { status: string; previous: string }>();
   private cache: Item[] | null = null;
+  private itemCache = new Map<string, Item | null>();
   private orderOverrides = new Map<string, { value: number; previous: unknown }>();
   private workOverrides = new Map<string, { sessions: WorkSession[]; taskStart: number | null; taskEnd: number | null; valueKey: string; previousKey: string }>();
   private ready = false;
@@ -24,33 +25,67 @@ export class DaylightStore {
   sortOrderGap = 10000;
   constructor(public app: App, plugin: Plugin, root = 'Daylight') {
     this.storage = new DaylightStorage(app,root);
-    const update = () => {
+    const notify = () => {
       if (this.notifyTimer !== null) { clearTimeout(this.notifyTimer); this.notifyTimer = null; }
-      this.cache = null; this.revision++;
+      this.revision++;
       for (const fn of this.listeners) fn();
     };
-    const onExternalChange = () => {
+    const update = (path?: string) => {
+      if (path) this.itemCache.delete(path); else this.itemCache.clear();
+      this.cache = null;
+      notify();
+    };
+    const schedule = () => {
       this.cache = null;
       if (!this.ready || this.notifyTimer !== null) return;
-      if (typeof setTimeout !== 'function') { update(); return; }
-      this.notifyTimer = setTimeout(() => {
-        this.notifyTimer = null;
-        update();
-      }, 16);
+      if (typeof setTimeout !== 'function') { notify(); return; }
+      this.notifyTimer = setTimeout(notify, 16);
     };
-    plugin.registerEvent(app.metadataCache.on('changed', onExternalChange));
-    plugin.registerEvent(app.metadataCache.on('resolved', onExternalChange));
-    plugin.registerEvent(app.vault.on('create', onExternalChange));
-    plugin.registerEvent(app.vault.on('delete', onExternalChange));
-    plugin.registerEvent(app.vault.on('rename', onExternalChange));
-    plugin.registerEvent(app.vault.on('modify', onExternalChange));
+    const relevant = (path: string) => this.storage.kind(path) !== null;
+    const onFileChange = (file: TAbstractFile, oldPath?: string) => {
+      if (file instanceof TFolder) {
+        const affects = (path: string) => path === this.storage.root || this.storage.root.startsWith(path + '/') || relevant(path + '/');
+        if (!affects(file.path) && !(oldPath && affects(oldPath))) return;
+        this.itemCache.clear(); schedule(); return;
+      }
+      if (!(file instanceof TFile)) return;
+      if (!relevant(file.path) && !(oldPath && relevant(oldPath))) return;
+      this.itemCache.delete(file.path);
+      if (oldPath) this.itemCache.delete(oldPath);
+      schedule();
+    };
+    // Link resolution may change when another file is renamed or created.
+    // Rebuild only entries whose resolved target has actually changed.
+    const onResolved = () => {
+      let changed = false;
+      for (const [path, item] of this.itemCache) {
+        if (!item) continue;
+        const file = app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) continue;
+        const fm = app.metadataCache.getFileCache(file)?.frontmatter;
+        const resolve = (value: unknown) => {
+          const link = typeof value === 'string' ? value.match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]$/) : null;
+          return link ? app.metadataCache.getFirstLinkpathDest(link[1], path)?.path ?? null : null;
+        };
+        if (resolve(fm?.project) !== item.projectPath || resolve(fm?.parent_task) !== (item.parentTaskPath ?? null)) {
+          this.itemCache.delete(path); changed = true;
+        }
+      }
+      if (changed) schedule();
+    };
+    plugin.registerEvent(app.metadataCache.on('changed', file => onFileChange(file)));
+    plugin.registerEvent(app.metadataCache.on('resolved', onResolved));
+    plugin.registerEvent(app.vault.on('create', file => onFileChange(file)));
+    plugin.registerEvent(app.vault.on('delete', file => onFileChange(file)));
+    plugin.registerEvent(app.vault.on('rename', (file, oldPath) => onFileChange(file, oldPath)));
+    plugin.registerEvent(app.vault.on('modify', file => onFileChange(file)));
     plugin.register(() => {
       if (this.notifyTimer !== null) { clearTimeout(this.notifyTimer); this.notifyTimer = null; }
       this.listeners.clear();
     });
     this.invalidate = update;
   }
-  invalidate: () => void;
+  invalidate: (path?: string) => void;
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   snapshot = () => this.revision;
   isReady = () => this.ready;
@@ -80,14 +115,25 @@ export class DaylightStore {
   items(): Item[] {
     if (this.cache) return this.cache;
     this.cache = this.storage.markdownFiles().flatMap(file => {
+      if (this.itemCache.has(file.path)) {
+        const item = this.itemCache.get(file.path);
+        return item ? [item] : [];
+      }
+      const parsed = this.parseItem(file);
+      this.itemCache.set(file.path, parsed);
+      return parsed ? [parsed] : [];
+    });
+    return this.cache;
+  }
+  private parseItem(file: TFile): Item | null {
       const cached = this.app.metadataCache.getFileCache(file), fm = cached?.frontmatter;
-      if (!fm) return [];
+      if (!fm) return null;
       const tags: string[] = Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [];
       const allTags = [...tags, ...(cached.tags?.map(t => t.tag) ?? [])].filter(t => typeof t === 'string').map(t => t.replace(/^#/, ''));
       const kinds = (['task', 'event', 'project'] as Kind[]).filter(k => allTags.includes(k));
-      if (kinds.length !== 1) return [];
+      if (kinds.length !== 1) return null;
       const kind = kinds[0];
-      if(this.storage.kind(file.path)!==kind)return [];
+      if(this.storage.kind(file.path)!==kind)return null;
       const raw = typeof fm.status === 'string' ? fm.status.trim() : '';
       const override = this.overrides.get(file.path);
       // Hold the result only while metadata still contains our previous value.
@@ -102,7 +148,7 @@ export class DaylightStore {
       const parent = typeof fm.parent_task === 'string' ? fm.parent_task : '';
       const parentLink = parent.match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]$/);
       const parentFile = parentLink ? this.app.metadataCache.getFirstLinkpathDest(parentLink[1],file.path) : null;
-      return [{ path: file.path, title: titleFor(file.basename, kind), kind,
+      return { path: file.path, title: titleFor(file.basename, kind), kind,
         status: this.overrides.get(file.path)?.status ?? raw, sortOrder, targetDate: dateValue(fm.target_date),
         start: dateTime(fm.schedule_start), end: dateTime(fm.schedule_end), due: dateTime(fm.due),
         projectPath: linked?.path ?? null,
@@ -124,9 +170,7 @@ export class DaylightStore {
             taskSessions: active ? active.sessions : sessions,
           };
         })(),
-      }];
-    });
-    return this.cache;
+      };
   }
   private file(path: string): TFile {
     const file = this.app.vault.getAbstractFileByPath(path);
@@ -165,7 +209,7 @@ export class DaylightStore {
         const previous = fm.sort_order; fm.sort_order = value;
         this.orderOverrides.set(item.path, {value, previous});
       });
-      last = value; this.invalidate();
+      last = value; this.invalidate(item.path);
     }
   }
   private async appendOrder(status: string, exclude = ''): Promise<number> {
@@ -187,7 +231,7 @@ export class DaylightStore {
         if (String(fm.status ?? '').trim() !== item.status || fm.sort_order !== current.sortOrder) throw new Error('タスクが更新されています。もう一度お試しください。');
         const previous = fm.sort_order; fm.sort_order = value; this.orderOverrides.set(item.path,{value,previous});
       });
-      this.invalidate();
+      this.invalidate(item.path);
     });
   }
   private workKey(sessions: WorkSession[], taskStart: number | null, taskEnd: number | null): string {
@@ -214,7 +258,7 @@ export class DaylightStore {
         if (item.kind === 'task') { recordWorkStatus(fm, previous); updatedWork = { ...fm }; }
       });
       if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
-      this.overrides.set(item.path, { status, previous: item.status }); this.invalidate();
+      this.overrides.set(item.path, { status, previous: item.status }); this.invalidate(item.path);
     }));
   }
   async startTask(item: Item) {
@@ -239,7 +283,7 @@ export class DaylightStore {
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
       });
       if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
-      this.overrides.set(item.path,{status:'on_going',previous:item.status});this.invalidate();
+      this.overrides.set(item.path,{status:'on_going',previous:item.status});this.invalidate(item.path);
     }));
   }
   async pauseTask(item: Item) {
@@ -256,7 +300,7 @@ export class DaylightStore {
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
       });
       if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
-      this.invalidate();
+      this.invalidate(item.path);
     }));
   }
   async finishTask(item: Item) {
@@ -274,14 +318,14 @@ export class DaylightStore {
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
       });
       if (updatedWork) this.captureWorkOverride(item.path, previousKey, updatedWork);
-      this.overrides.set(item.path,{status:'done',previous:item.status});this.invalidate();
+      this.overrides.set(item.path,{status:'done',previous:item.status});this.invalidate(item.path);
     }));
   }
   async memo(path: string, text: string) {
     const stamp = `${dayKey()} ${timeLabel(Date.now())}`;
     await this.queue(path, async () => {
       await this.app.vault.process(this.file(path), content => appendMemo(content, text, stamp));
-      this.invalidate();
+      this.invalidate(path);
     });
   }
   async notes(path: string) { return notesText(await this.app.vault.read(this.file(path))); }

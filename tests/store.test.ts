@@ -39,10 +39,11 @@ async function fixture() {
   const trashed = new Map<string,string>(); const renames: string[][] = [];
   const template = new File('Daylight/Templates/Event.md');
   const templates = [template, new File('Daylight/Templates/Task.md'), new File('Daylight/Templates/Project.md')];
+  const events = new Map<string, (...args: any[]) => void>();
   const app = {
-    metadataCache: { on: () => ({}), getFileCache: (f: File) => ({ frontmatter: fm.get(f.path) }),
+    metadataCache: { on: (name: string, callback: (...args: any[]) => void) => { events.set('metadata:' + name, callback); return {}; }, getFileCache: (f: File) => ({ frontmatter: fm.get(f.path) }),
       getFirstLinkpathDest: (link: string) => files.find(f=>f.path.replace(/\.md$/,'')===link||f.basename===link)??null },
-    vault: { on: () => ({}), getMarkdownFiles: () => files,
+    vault: { on: (name: string, callback: (...args: any[]) => void) => { events.set('vault:' + name, callback); return {}; }, getMarkdownFiles: () => files,
       getAbstractFileByPath: (p: string): File | Folder | null | undefined => templates.find(f => f.path === p) ?? files.find(f => f.path === p) ?? (files.some(f => f.path.startsWith(p + '/')) ? new Folder(p, files) : null),
       read: async (f: File) => templates.includes(f) ? readFileSync('templates/'+f.path.split('/').at(-1),'utf8') : bodies.get(f.path) ?? '',
       create: async (p:string,content:string) => {
@@ -68,7 +69,7 @@ async function fixture() {
     },
   };
   const store = new module.exports.DaylightStore(app, { registerEvent() {}, register() {} });
-  return { store, fm, bodies, task, project, files, app, trashed, renames, templates };
+  return { store, fm, bodies, task, project, files, app, trashed, renames, templates, events };
 }
 test('frontmatter kinds, project resolution, scheduled tasks and scope', async () => {
   const {store, task, project}=await fixture();
@@ -85,6 +86,24 @@ test('item discovery visits only configured folders including nested notes', asy
   assert.deepEqual(Array.from(store.items(), (item: any) => item.path).sort(), [
     'Daylight/Events/2026/Meeting.md', 'Daylight/Projects/P.md', 'Daylight/Tasks/Task 2026-11-06.md',
   ]);
+});
+test('external updates invalidate only relevant files and refresh changed link targets', async () => {
+  const {store, app, task, project, files, fm, events} = await fixture();
+  store.markReady();
+  const first = store.items();
+  const revision = store.snapshot();
+  events.get('vault:modify')!(files.find(f => f.path.startsWith('daily_')));
+  assert.equal(store.snapshot(), revision);
+  assert.equal(store.items(), first);
+  fm.set(task.path, {...fm.get(task.path), status:'done'});
+  events.get('metadata:changed')!(task);
+  const changed = store.items();
+  assert.equal(changed.find((i:any) => i.path === task.path).status, 'done');
+  assert.equal(changed.find((i:any) => i.path === project.path), first.find((i:any) => i.path === project.path));
+  files.splice(files.indexOf(project), 1);
+  events.get('vault:delete')!(project);
+  events.get('metadata:resolved')!();
+  assert.equal(store.items().find((i:any) => i.path === task.path).projectPath, null);
 });
 test('status saves preserve unrelated properties and refuse stale edits', async () => {
   const {store,task,fm}=await fixture();
