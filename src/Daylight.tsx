@@ -1,3 +1,4 @@
+import { DEFAULT_LANGUAGE, Language, t, translate, useLanguage } from './i18n';
 import React, { CSSProperties, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
 import { DaylightStore } from './store';
@@ -27,18 +28,20 @@ function Icon({ name, size = 16 }: { name: string; size?: number }) {
 }
 const stateColor = (item: Item) => ({ '--daylight-state': isStatus(item.status) ? STATUS[item.status].color : '#94a3b8' } as CSSProperties);
 function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
+  useLanguage();
   const [busy, setBusy] = useState(false);
-  return <select className="daylight-status" style={stateColor(item)} aria-label={`${item.title}の状態`} value={item.status} disabled={busy}
+  return <select className="daylight-status" style={stateColor(item)} aria-label={t("{0}の状態", item.title)} value={item.status} disabled={busy}
     onClick={e => e.stopPropagation()} onChange={async e => {
       const next = e.target.value; setBusy(true);
       try { await store.setStatus(item, next); } catch (e) { new Notice((e as Error).message); }
       finally { setBusy(false); }
     }}>
-    {!isStatus(item.status) && <option value={item.status}>{item.status || '未設定'}</option>}
+    {!isStatus(item.status) && <option value={item.status}>{item.status || t("未設定")}</option>}
     {Object.entries(STATUS).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
   </select>;
 }
 function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string, event?: React.MouseEvent) => void; projectPath: string }) {
+  useLanguage();
   const candidates = useMemo(() => timelineCandidates(items, day), [items, day]);
   const running = useMemo(() => candidates.some(isTaskRunning), [candidates]);
   const timelineNow = running ? now : 0;
@@ -72,7 +75,7 @@ function Timeline({ items, day, now, store, onSelect, projectPath }: { items: It
   }, [day, firstHour]);
   const nowMinute = (now - dayStart(day)) / 60000;
   return <section className="daylight-panel daylight-schedule">
-    <div className="daylight-section-head"><h2>タイムライン</h2><span className="daylight-count">{slots.length}</span><button className="daylight-icon-button daylight-add-event" aria-label="予定を追加" onClick={() => openEventModal(store,rangeDateTimes(day,{start:540,end:600}),projectPath)}>＋</button></div>
+    <div className="daylight-section-head"><h2>{t("タイムライン")}</h2><span className="daylight-count">{slots.length}</span><button className="daylight-icon-button daylight-add-event" aria-label={t("予定を追加")} onClick={() => openEventModal(store,rangeDateTimes(day,{start:540,end:600}),projectPath)}>＋</button></div>
     <div className="daylight-timeline-scroll" ref={scroller}>
       <div className="daylight-timeline" style={{ height: total + 28 }}>
         {Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i).map(hour =>
@@ -81,19 +84,19 @@ function Timeline({ items, day, now, store, onSelect, projectPath }: { items: It
           {slots.map((slot, idx) => <article key={`${slot.item.path}:${slot.source}:${slot.from}:${idx}`} className={`daylight-slot daylight-slot-${slot.item.kind}${slot.source === 'actual' ? ' daylight-slot-actual' : ''}${slot.running ? ' is-running' : ''}`} style={{
             ...stateColor(slot.item), top: slot.start - start, height: Math.min(total - (slot.start - start), Math.max(slot.source === 'actual' ? 2 : 26, slot.end - slot.start)),
             left: `${slot.column * 100 / slot.columns}%`, width: `calc(${100 / slot.columns}% - 5px)`,
-          }} title={`${slot.item.title} · ${slot.source === 'actual' ? '実績' : '予定'} ${timeLabel(slot.from)}–${slot.running ? '実行中' : timeLabel(slot.to)}${slot.item.projectLabel ? ' · ' + slot.item.projectLabel : ''}`} onClick={e => {
+          }} title={`${slot.item.title} · ${slot.source === 'actual' ? t("実績") : t("予定")} ${timeLabel(slot.from)}–${slot.running ? t("実行中") : timeLabel(slot.to)}${slot.item.projectLabel ? ' · ' + slot.item.projectLabel : ''}`} onClick={e => {
             if (!(e.target as Element).closest('button,select,input,textarea')) onSelect(slot.item.path, e);
           }}>
             <button className="daylight-slot-main" onClick={e => onSelect(slot.item.path, e)}>
               <span className="daylight-slot-heading"><Icon name={slot.item.kind} size={13} /><strong>{slot.item.title}</strong></span>
-              {slot.end - slot.start >= 42 && <time>{slot.source === 'actual' ? '実績 ' : ''}{timeLabel(slot.from)}–{slot.running ? '実行中' : timeLabel(slot.to)}</time>}
+              {slot.end - slot.start >= 42 && <time>{slot.source === 'actual' ? t("実績") : ''}{timeLabel(slot.from)}–{slot.running ? t("実行中") : timeLabel(slot.to)}</time>}
               {slot.end - slot.start >= 76 && slot.item.projectLabel && <span className="daylight-slot-project">{slot.item.projectLabel}</span>}
             </button>
             {slot.end - slot.start >= 104 && <StatusSelect item={slot.item} store={store} />}
           </article>)}
           {day === dayKey(now) && nowMinute >= start && nowMinute <= lastHour * 60 && <div className="daylight-now" style={{ top: nowMinute - start }}><span /></div>}
         </TimeSelection>
-        {!slots.length && <span className="daylight-timeline-empty">予定なし</span>}
+        {!slots.length && <span className="daylight-timeline-empty">{t("予定なし")}</span>}
       </div>
     </div>
   </section>;
@@ -103,6 +106,7 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
   item: Item; store: DaylightStore; draft: string; onDraft: (text: string) => void;
   onSaved: (text: string) => void; onClose: () => void; revision: number; onRetarget:(path:string)=>void;
 }) {
+  useLanguage();
   const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const memoSaving=useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -113,30 +117,30 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
     return () => { alive = false; };
   }, [item.path, revision]);
   return <aside className="daylight-detail" role="dialog" aria-label={item.title}>
-    <div className="daylight-detail-actions"><span>{item.kind === 'task' ? 'タスク' : item.kind === 'event' ? '予定' : 'プロジェクト'}</span>
-      <button className="daylight-icon-button" aria-label="ノートを開く" onClick={() => void store.open(item.path).catch(e => new Notice(e.message))}><Icon name="open" /></button>
-      <button className="daylight-icon-button" aria-label="詳細を閉じる" onClick={onClose}><Icon name="close" /></button>
+    <div className="daylight-detail-actions"><span>{item.kind === 'task' ? t("タスク") : item.kind === 'event' ? t("予定") : t("プロジェクト")}</span>
+      <button className="daylight-icon-button" aria-label={t("ノートを開く")} onClick={() => void store.open(item.path).catch(e => new Notice(e.message))}><Icon name="open" /></button>
+      <button className="daylight-icon-button" aria-label={t("詳細を閉じる")} onClick={onClose}><Icon name="close" /></button>
     </div>
     <h2 tabIndex={-1} ref={heading}>{item.title}</h2>
-    {item.kind==='task'?<TaskProperties item={item} store={store} revision={revision} onSaved={onRetarget} actions={<button type="button" className="daylight-detail-delete" onClick={() => openDeleteNoteModal(store,item,onClose)}>削除</button>}/>:<>
+    {item.kind==='task'?<TaskProperties item={item} store={store} revision={revision} onSaved={onRetarget} actions={<button type="button" className="daylight-detail-delete" onClick={() => openDeleteNoteModal(store,item,onClose)}>{t("削除")}</button>}/>:<>
     <StatusSelect item={item} store={store} />
     <dl className="daylight-detail-meta">
-      {item.projectLabel && <><dt>プロジェクト</dt><dd>{item.projectLabel}</dd></>}
-      {item.targetDate && <><dt>予定日</dt><dd>{item.targetDate}</dd></>}
-      {item.start !== null && <><dt>開始</dt><dd>{dayKey(item.start)} {timeLabel(item.start)}</dd></>}
-      {item.end !== null && <><dt>終了</dt><dd>{dayKey(item.end)} {timeLabel(item.end)}</dd></>}
-      {item.due !== null && <><dt>締切</dt><dd>{dayKey(item.due)} {timeLabel(item.due)}</dd></>}
+      {item.projectLabel && <><dt>{t("プロジェクト")}</dt><dd>{item.projectLabel}</dd></>}
+      {item.targetDate && <><dt>{t("予定日")}</dt><dd>{item.targetDate}</dd></>}
+      {item.start !== null && <><dt>{t("開始")}</dt><dd>{dayKey(item.start)} {timeLabel(item.start)}</dd></>}
+      {item.end !== null && <><dt>{t("終了")}</dt><dd>{dayKey(item.end)} {timeLabel(item.end)}</dd></>}
+      {item.due !== null && <><dt>{t("締切")}</dt><dd>{dayKey(item.due)} {timeLabel(item.due)}</dd></>}
     </dl>
     </>}
     {item.kind === 'task' && itemSessions(item).length > 0 && <div className="daylight-work-sessions">
-      <h3>作業セッション</h3>
+      <h3>{t("作業セッション")}</h3>
       <ul>{itemSessions(item).map((s, idx) => <li key={`${s.start}-${idx}`}>
         <span>{dayKey(s.start)} {timeLabel(s.start)} → {s.end != null ? `${dayKey(s.end) === dayKey(s.start) ? '' : `${dayKey(s.end)} `}${timeLabel(s.end)}` : '--:--'}</span>
         {s.end != null && s.end >= s.start && <small>{formatDuration((s.end - s.start) / 60000)}</small>}
       </li>)}</ul>
     </div>}
-    {workDuration(item) && <p className="daylight-work-duration">作業時間 {workDuration(item)}</p>}
-    <h3>メモ</h3>
+    {workDuration(item) && <p className="daylight-work-duration">{t("作業時間")}{' '}{workDuration(item)}</p>}
+    <h3>{t("メモ")}</h3>
     {notes && <div className="daylight-notes">{notes}</div>}
     <form onKeyDownCapture={e=>submitOnCommandEnter(e,memoSaving.current)} onSubmit={async e => {
       e.preventDefault(); if (memoSaving.current || !draft.trim()) return;
@@ -144,29 +148,34 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
       try { await store.memo(item.path, text); onSaved(text); setNotes(await store.notes(item.path)); }
       catch (e) { setError((e as Error).message); } finally { memoSaving.current=false;setBusy(false); }
     }}>
-      <textarea value={draft} onChange={e => onDraft(e.target.value)} aria-label="メモを追記" placeholder="メモを追記…" rows={4} />
+      <textarea value={draft} onChange={e => onDraft(e.target.value)} aria-label={t("メモを追記")} placeholder={t("メモを追記…")} rows={4} />
       {error && <p className="daylight-error" role="alert">{error}</p>}
-      <div className="daylight-detail-save-actions">{item.kind === 'project' && <button type="button" className="daylight-detail-delete" disabled={busy} onClick={() => openDeleteNoteModal(store,item,onClose)}>削除</button>}<button className="daylight-save" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !draft.trim()}>{busy ? '保存中…' : '追加'}</button></div>
+      <div className="daylight-detail-save-actions">{item.kind === 'project' && <button type="button" className="daylight-detail-delete" disabled={busy} onClick={() => openDeleteNoteModal(store,item,onClose)}>{t("削除")}</button>}<button className="daylight-save" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !draft.trim()}>{busy ? t("保存中…") : t("追加")}</button></div>
     </form>
   </aside>;
 }
 
 const alwaysReady = () => true;
 
-function Loading() {
+function Loading({ language }: { language: Language }) {
+  useLanguage();
   return <div className="daylight-app daylight-is-loading" role="status" aria-live="polite" aria-busy="true">
-    <div className="daylight-loading"><span className="daylight-loading-spinner" aria-hidden="true" /><span>読み込み中…</span></div>
+    <div className="daylight-loading"><span className="daylight-loading-spinner" aria-hidden="true" /><span>{translate(language, 'loading')}</span></div>
   </div>;
 }
 
 export function Daylight({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
+  useLanguage();
   const readySnapshot = store.isReady ?? alwaysReady;
   const ready = useSyncExternalStore(store.subscribe, readySnapshot, readySnapshot);
-  if (!ready) return <Loading />;
+  useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
+  const language = store.language ?? DEFAULT_LANGUAGE;
+  if (!ready) return <Loading language={language} />;
   return <PreparedDashboard store={store} initialDate={initialDate} />;
 }
 
 function PreparedDashboard({ store, initialDate }: { store: DaylightStore; initialDate: string | null }) {
+  useLanguage();
   const [visible, setVisible] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -182,11 +191,12 @@ function PreparedDashboard({ store, initialDate }: { store: DaylightStore; initi
     <div className={visible ? '' : 'daylight-pending'} aria-hidden={!visible} inert={!visible}>
       <DaylightDashboard store={store} initialDate={initialDate} />
     </div>
-    {!visible && <div className="daylight-loading-overlay"><Loading /></div>}
+    {!visible && <div className="daylight-loading-overlay"><Loading language={store.language ?? DEFAULT_LANGUAGE} /></div>}
   </div>;
 }
 
 function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
+  useLanguage();
   const revision = useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
   const items = useMemo(() => store.items(), [store, revision]);
   const [now, setNow] = useState(Date.now());
@@ -219,34 +229,34 @@ function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore
   const invalid = scoped.filter(i => i.kind !== 'project' && !hasSchedule(i) && (i.targetDate === day || (i.start !== null && dayKey(i.start) === day)) && (i.kind === 'event' || i.start !== null || i.end !== null));
   return <div className={`daylight-app${selectedItem ? ' daylight-has-detail' : ''}`} ref={root} onKeyDown={e => { if (e.key === 'Escape' && selected) { e.stopPropagation(); close(); } }}>
     <header className="daylight-header">
-      <div className="daylight-date-nav"><button className="daylight-icon-button" aria-label="前日" onClick={() => setDay(moveDay(day, -1))}><Icon name="left" /></button>
+      <div className="daylight-date-nav"><button className="daylight-icon-button" aria-label={t("前日")} onClick={() => setDay(moveDay(day, -1))}><Icon name="left" /></button>
         <DatePicker day={day} today={dayKey(now)} items={scoped} onChange={setDay} />
-        <button className="daylight-icon-button" aria-label="翌日" onClick={() => setDay(moveDay(day, 1))}><Icon name="right" /></button>
+        <button className="daylight-icon-button" aria-label={t("翌日")} onClick={() => setDay(moveDay(day, 1))}><Icon name="right" /></button>
       </div>
-      <div className="daylight-header-options">{project && <button className="daylight-filter-chip" onClick={() => setProject(null)}>{currentProject?.title ?? 'プロジェクト'}<Icon name="close" size={12} /></button>}
+      <div className="daylight-header-options">{project && <button className="daylight-filter-chip" onClick={() => setProject(null)}>{currentProject?.title ?? t("プロジェクト")}<Icon name="close" size={12} /></button>}
       </div>
     </header>
     <div className="daylight-layout">
       <Timeline items={scoped} day={day} now={now} store={store} onSelect={select} projectPath={project ?? ''} />
       <div className="daylight-side">
         <section className="daylight-panel daylight-tasks">
-          <div className="daylight-section-head"><h2>タスク</h2><span className="daylight-count">{boardTasks.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="タスクを追加" title="タスクを追加" onClick={() => openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '')}>＋</button></div>
-          <div className="daylight-tabs" role="tablist" aria-label="タスクの表示範囲">
-            {([['day', '選択日'], ['ongoing', '進行中'], ['unscheduled', '予定日未定'], ['all', 'すべて']] as const).map(([id, label]) =>
-              <button role="tab" aria-selected={tab === id} className={tab === id ? 'is-active' : ''} key={id} onClick={() => setTab(id)}>{id === 'day' && day === dayKey(now) ? '今日' : label}</button>)}
+          <div className="daylight-section-head"><h2>{t("タスク")}</h2><span className="daylight-count">{boardTasks.length}</span><button className="daylight-icon-button daylight-add-item" aria-label={t("タスクを追加")} title={t("タスクを追加")} onClick={() => openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '')}>＋</button></div>
+          <div className="daylight-tabs" role="tablist" aria-label={t("タスクの表示範囲")}>
+            {([['day', t("選択日")], ['ongoing', t("進行中")], ['unscheduled', t("予定日未定")], ['all', t("すべて")]] as const).map(([id, label]) =>
+              <button role="tab" aria-selected={tab === id} className={tab === id ? 'is-active' : ''} key={id} onClick={() => setTab(id)}>{id === 'day' && day === dayKey(now) ? t("今日") : label}</button>)}
           </div>
           <Kanban items={boardTasks} allItems={items} store={store} onSelect={select} onAddTask={status=>openTaskModal(store,tab === 'unscheduled' ? '' : day,project ?? '',status)} />
         </section>
-        {invalid.length > 0 && <section className="daylight-panel daylight-unscheduled"><div className="daylight-section-head"><h2>日時の確認</h2><span className="daylight-count">{invalid.length}</span></div>
+        {invalid.length > 0 && <section className="daylight-panel daylight-unscheduled"><div className="daylight-section-head"><h2>{t("日時の確認")}</h2><span className="daylight-count">{invalid.length}</span></div>
           {invalid.map(i => <button key={i.path} className="daylight-schedule-warning" onClick={e => select(i.path, e)}><Icon name={i.kind} /><span>{i.title}</span></button>)}</section>}
-        <section className="daylight-panel daylight-projects"><div className="daylight-section-head"><h2>プロジェクト</h2><span className="daylight-count">{projects.length}</span><button className="daylight-icon-button daylight-add-item" aria-label="プロジェクトを追加" title="プロジェクトを追加" onClick={() => openProjectModal(store)}>＋</button></div>
+        <section className="daylight-panel daylight-projects"><div className="daylight-section-head"><h2>{t("プロジェクト")}</h2><span className="daylight-count">{projects.length}</span><button className="daylight-icon-button daylight-add-item" aria-label={t("プロジェクトを追加")} title={t("プロジェクトを追加")} onClick={() => openProjectModal(store)}>＋</button></div>
           <div className="daylight-project-grid">{projects.map(p => {
             const count = projectCounts.get(p.path) ?? 0;
             return <article className={`daylight-project${project === p.path ? ' is-selected' : ''}`} key={p.path} onClick={e => { if (!(e.target as Element).closest('button,select,input,textarea')) select(p.path, e); }}>
               <button className="daylight-project-main" aria-pressed={project === p.path} onClick={e => { if (e.metaKey || e.ctrlKey) select(p.path, e); else setProject(project === p.path ? null : p.path); }}><Icon name="project" /><strong>{p.title}</strong><span>{count}</span></button>
-              <div className="daylight-project-bottom"><StatusSelect item={p} store={store} /><button className="daylight-icon-button" aria-label={`${p.title}の詳細`} onClick={e => select(p.path, e)}><Icon name="open" size={14} /></button></div>
+              <div className="daylight-project-bottom"><StatusSelect item={p} store={store} /><button className="daylight-icon-button" aria-label={t("{0}の詳細", p.title)} onClick={e => select(p.path, e)}><Icon name="open" size={14} /></button></div>
             </article>;
-          })}</div>{!projects.length && <p className="daylight-empty">プロジェクトなし</p>}
+          })}</div>{!projects.length && <p className="daylight-empty">{t("プロジェクトなし")}</p>}
         </section>
       </div>
     </div>
@@ -254,6 +264,6 @@ function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore
       onDraft={text => setDrafts(prev => ({ ...prev, [selectedItem.path]: text }))}
       onSaved={text => setDrafts(prev => prev[selectedItem.path] === text ? { ...prev, [selectedItem.path]: '' } : prev)} onClose={close}
       onRetarget={path=>{const previous=selectedItem.path;setSelected(path);if(path!==previous)setDrafts(prev=>{if(!Object.hasOwn(prev,previous))return prev;const next={...prev,[path]:prev[previous]};delete next[previous];return next;});}} />}
-    {selected && !selectedItem && <div className="daylight-error" role="alert">ノートが見つかりません。<button onClick={close}>閉じる</button></div>}
+    {selected && !selectedItem && <div className="daylight-error" role="alert">{t("ノートが見つかりません。")}<button onClick={close}>{t("閉じる")}</button></div>}
   </div>;
 }

@@ -1,3 +1,4 @@
+import { t, useLanguage } from './i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStore } from './store';
@@ -6,6 +7,7 @@ import { localDateTime, PROPERTY_LABELS, PropertyChanges, propertyType, TASK_FIE
 import { submitOnCommandEnter } from './shortcuts';
 
 export function TaskProperties({ item, store, revision, onSaved, actions }: { item:Item; store:DaylightStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode }) {
+  useLanguage();
   const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(null),[changes,setChanges]=useState<PropertyChanges>({});
   const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[newType,setNewType]=useState('text');
@@ -19,7 +21,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     return ()=>{cancelled=true;};
   },[item.path,revision]);
   const change=(key:string,value:unknown)=>{dirty.current=true;setChanges(prev=>({...prev,[key]:value}));setError('');};
-  if(!snapshot)return <div className="daylight-task-properties"><p className={error?'daylight-error':'daylight-property-loading'}>{error||'読み込み中…'}</p></div>;
+  if(!snapshot)return <div className="daylight-task-properties"><p className={error?'daylight-error':'daylight-property-loading'}>{error||t("読み込み中…")}</p></div>;
   const keys=Array.from(new Set([...TASK_FIELDS,...Object.keys(snapshot.properties),...Object.keys(changes)]));
   const value=(key:string)=>Object.hasOwn(changes,key)?changes[key]:snapshot.properties[key]??null;
   const type=(key:string)=>propertyType(key,snapshot.properties[key],types[key]||snapshot.types[key]);
@@ -29,16 +31,16 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     const text=current===null||current===undefined?'':String(current);
     let control:React.ReactNode;
     if(kind==='status')control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value)}>
-      {!isStatus(text)&&<option value={text}>{text||'未設定'}</option>}{Object.entries(STATUS).map(([id,s])=><option key={id} value={id}>{s.label}</option>)}</select>;
+      {!isStatus(text)&&<option value={text}>{text||t("未設定")}</option>}{Object.entries(STATUS).map(([id,s])=><option key={id} value={id}>{s.label}</option>)}</select>;
     else if(kind==='project'||kind==='parent_task') {
       const candidates=links.filter(i=>i.kind===(kind==='project'?'project':'task')&&i.path!==item.path);
-      const options=candidates.map(i=>({value:`[[${i.path.replace(/\.md$/,'')}]]`,label:i.title+(kind==='parent_task'?` · ${i.targetDate||'予定日未定'}`:'')}));
+      const options=candidates.map(i=>({value:`[[${i.path.replace(/\.md$/,'')}]]`,label:i.title+(kind==='parent_task'?` · ${i.targetDate||t("予定日未定")}`:'')}));
       const originalLabel=kind==='project'&&item.projectLabel?item.projectLabel:text.replace(/^\[\[|\]\]$/g,'');
-      control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value||null)}><option value="">未設定</option>
-        {text&&!options.some(o=>o.value===text)&&<option value={text}>{originalLabel||'現在の設定'}</option>}
+      control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value||null)}><option value="">{t("未設定")}</option>
+        {text&&!options.some(o=>o.value===text)&&<option value={text}>{originalLabel||t("現在の設定")}</option>}
         {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>;
-    } else if(kind==='boolean')control=<select value={current===null?'':String(current)} aria-label={label} onChange={e=>change(key,e.target.value===''?null:e.target.value==='true')}><option value="">未設定</option><option value="true">はい</option><option value="false">いいえ</option></select>;
-    else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder="1行に1項目" value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.target.value)} />;
+    } else if(kind==='boolean')control=<select value={current===null?'':String(current)} aria-label={label} onChange={e=>change(key,e.target.value===''?null:e.target.value==='true')}><option value="">{t("未設定")}</option><option value="true">{t("はい")}</option><option value="false">{t("いいえ")}</option></select>;
+    else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder={t("1行に1項目")} value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.target.value)} />;
     else if(kind==='yaml')control=<textarea className="daylight-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.target.value)} />;
     else if(kind==='datetime') {
       const local=localDateTime(current);
@@ -54,7 +56,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     try {
       for(const key of Object.keys(patch)) {
         const kind=type(key),raw=patch[key];
-        if(kind==='number'&&typeof raw==='string') {if(raw.trim()==='')patch[key]=null;else {const n=Number(raw);if(!Number.isFinite(n))throw new Error(`${PROPERTY_LABELS[key]||key}は数値を入力してください。`);patch[key]=n;}}
+        if(kind==='number'&&typeof raw==='string') {if(raw.trim()==='')patch[key]=null;else {const n=Number(raw);if(!Number.isFinite(n))throw new Error(t("{0}は数値を入力してください。", PROPERTY_LABELS[key]||key));patch[key]=n;}}
         if(kind==='list'&&typeof raw==='string')patch[key]=raw.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
         if(kind==='yaml'&&typeof raw==='string')patch[key]=parseYaml(raw)??null;
       }
@@ -64,21 +66,21 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
       const file=await store.updateTask(snapshot,patch);saved=true;
       const refreshed=await store.loadTask(file.path);
       if(mounted.current)install(refreshed);onSaved(file.path);
-    } catch(e){if(mounted.current)setError(saved?'保存済みです。詳細を開き直してください。':(e as Error).message.replaceAll('再読み込みしてください。','詳細を開き直してください。'));}
+    } catch(e){if(mounted.current)setError(saved?t("保存済みです。詳細を開き直してください。"):(e as Error).message.replaceAll(t("再読み込みしてください。"),t("詳細を開き直してください。")));}
     finally {saving.current=false;if(mounted.current)setBusy(false);}
   }}>
-    <div className="daylight-property-header"><h3>プロパティ</h3></div>
+    <div className="daylight-property-header"><h3>{t("プロパティ")}</h3></div>
     <fieldset disabled={busy} className="daylight-event-fields">
       {TASK_FIELDS.map(field)}
       <div className="daylight-extra-properties">{keys.filter(k=>!TASK_FIELDS.includes(k)).map(field)}</div>
       {adding?<div className="daylight-new-property">
-        <input autoFocus aria-label="新しいプロパティ名" placeholder="プロパティ名" value={name} onChange={e=>setName(e.target.value)} />
-        <select aria-label="新しいプロパティの種類" value={newType} onChange={e=>setNewType(e.target.value)}>{[['text','テキスト'],['number','数値'],['boolean','チェック'],['date','日付'],['datetime','日時'],['list','リスト'],['yaml','構造化データ']].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
-        <button type="button" onClick={()=>{const key=name.trim();if(!key||keys.includes(key)||/[\r\n\0]/.test(key)){setError('重複しないプロパティ名を入力してください。');return;}setTypes(prev=>({...prev,[key]:newType==='boolean'?'checkbox':newType}));change(key,newType==='yaml'?{}:newType==='list'?[]:null);setAdding(false);setName('');}}>追加</button>
+        <input autoFocus aria-label={t("新しいプロパティ名")} placeholder={t("プロパティ名")} value={name} onChange={e=>setName(e.target.value)} />
+        <select aria-label={t("新しいプロパティの種類")} value={newType} onChange={e=>setNewType(e.target.value)}>{[['text',t("テキスト")],['number',t("数値")],['boolean',t("チェック")],['date',t("日付")],['datetime',t("日時")],['list',t("リスト")],['yaml',t("構造化データ")]].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
+        <button type="button" onClick={()=>{const key=name.trim();if(!key||keys.includes(key)||/[\r\n\0]/.test(key)){setError(t("重複しないプロパティ名を入力してください。"));return;}setTypes(prev=>({...prev,[key]:newType==='boolean'?'checkbox':newType}));change(key,newType==='yaml'?{}:newType==='list'?[]:null);setAdding(false);setName('');}}>{t("追加")}</button>
         <button type="button" onClick={()=>setAdding(false)}>×</button>
-      </div>:<button type="button" className="daylight-add-property" onClick={()=>setAdding(true)}>＋ プロパティ</button>}
+      </div>:<button type="button" className="daylight-add-property" onClick={()=>setAdding(true)}>{t("＋ プロパティ")}</button>}
       {error&&<p className="daylight-error" role="alert">{error}</p>}
-      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?'保存中…':'保存'}</button></div>
+      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?t("保存中…"):t("保存")}</button></div>
     </fieldset>
   </form>;
 }

@@ -1,3 +1,4 @@
+import { t, useLanguage } from './i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { adjustRange, RangeAction, rangeDateTimes, selectRange, TIME_STEP, TimeRange } from './event';
 import { dayStart, timeLabel } from './model';
@@ -8,6 +9,7 @@ export function TimeSelection({ day, scroller, onConfirm, children }: {
   day: string; scroller: React.RefObject<HTMLDivElement | null>;
   onConfirm: (range: { start: string; end: string }) => void; children: React.ReactNode;
 }) {
+  useLanguage();
   const layer = useRef<HTMLDivElement>(null), active = useRef<Drag | null>(null);
   const tap = useRef<{ id: number; x: number; y: number } | null>(null);
   const [range, setRange] = useState<TimeRange | null>(null), [dragging, setDragging] = useState(false);
@@ -85,16 +87,16 @@ export function TimeSelection({ day, scroller, onConfirm, children }: {
     {children}
     {range && <>
       <div className="daylight-selection" style={{ top: range.start, height: range.end - range.start }} onPointerDown={e => begin(e, 'move')}>
-        <button className="daylight-range-handle daylight-range-start" aria-label="開始時刻を調整" onPointerDown={e => begin(e, 'start')} onKeyDown={e => {
+        <button className="daylight-range-handle daylight-range-start" aria-label={t("開始時刻を調整")} onPointerDown={e => begin(e, 'start')} onKeyDown={e => {
           if (['ArrowUp','ArrowDown'].includes(e.key)) { e.preventDefault(); update(adjustRange(range,'start',0,range.start+(e.key==='ArrowUp'?-TIME_STEP:TIME_STEP))); }
         }} />
-        <button className="daylight-range-handle daylight-range-end" aria-label="終了時刻を調整" onPointerDown={e => begin(e, 'end')} onKeyDown={e => {
+        <button className="daylight-range-handle daylight-range-end" aria-label={t("終了時刻を調整")} onPointerDown={e => begin(e, 'end')} onKeyDown={e => {
           if (['ArrowUp','ArrowDown'].includes(e.key)) { e.preventDefault(); update(adjustRange(range,'end',0,range.end+(e.key==='ArrowUp'?-TIME_STEP:TIME_STEP))); }
         }} />
       </div>
       {!dragging && <div className="daylight-selection-tools" style={{ top: range.start >= 42 ? range.start - 38 : range.end + 8 }}>
-        <span>{label}</span><button onClick={confirm} aria-keyshortcuts="Enter" title="Enterで予定を追加">予定を追加</button>
-        <button className="daylight-range-cancel" aria-label="範囲選択をキャンセル" onClick={clear}>×</button>
+        <span>{label}</span><button onClick={confirm} aria-keyshortcuts="Enter" title={t("Enterで予定を追加")}>{t("予定を追加")}</button>
+        <button className="daylight-range-cancel" aria-label={t("範囲選択をキャンセル")} onClick={clear}>×</button>
       </div>}
       {dragging && <span className="daylight-selection-time" style={{ top: range.start + 4 }}>{label}</span>}
       <span className="daylight-sr-only" role="status" aria-live="polite">{label}</span>

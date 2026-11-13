@@ -1,3 +1,5 @@
+import * as i18n from '../src/i18n';
+i18n.setLanguage('ja');
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, chmodSync, readdirSync, rmSync } from 'node:fs';

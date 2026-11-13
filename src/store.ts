@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { App, Plugin, TAbstractFile, TFile, TFolder, parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStorage } from './storage';
 import { orderedTasks, orderBetween } from './order';
@@ -6,6 +7,7 @@ import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, itemSessions, 
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
 import { isFrontmatterRunning, isTaskRunning, pauseWork, recordWorkStatus } from './execution';
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
+import { DEFAULT_LANGUAGE, Language } from './i18n';
 
 export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; content: string }
 
@@ -23,6 +25,7 @@ export class DaylightStore {
   private ready = false;
   private notifyTimer: ReturnType<typeof setTimeout> | null = null;
   sortOrderGap = 10000;
+  language: Language = DEFAULT_LANGUAGE;
   constructor(public app: App, plugin: Plugin, root = 'Daylight') {
     this.storage = new DaylightStorage(app,root);
     const notify = () => {
@@ -174,18 +177,18 @@ export class DaylightStore {
   }
   private file(path: string): TFile {
     const file = this.app.vault.getAbstractFileByPath(path);
-    if (!(file instanceof TFile) || file.extension !== 'md' || this.storage.kind(path) === null) throw new Error('ノートが見つかりません。');
+    if (!(file instanceof TFile) || file.extension !== 'md' || this.storage.kind(path) === null) throw new Error(t("ノートが見つかりません。"));
     return file;
   }
   private async queue(path: string, work: () => Promise<void>) {
-    if(this.storageChanging)throw new Error('Daylightフォルダを移動中です。完了後にもう一度お試しください。');
+    if(this.storageChanging)throw new Error(t("Daylightフォルダを移動中です。完了後にもう一度お試しください。"));
     const previous = this.pending.get(path) ?? Promise.resolve();
     const task = previous.catch(() => {}).then(work);
     this.pending.set(path, task);
     try { await task; } finally { if (this.pending.get(path) === task) this.pending.delete(path); }
   }
   async relocateRoot(next: string, save: () => Promise<void>) {
-    if(this.storageChanging)throw new Error('Daylightフォルダを移動中です。');
+    if(this.storageChanging)throw new Error(t("Daylightフォルダを移動中です。"));
     this.storageChanging=true;
     const previous=this.storage.root;
     try {
@@ -194,7 +197,7 @@ export class DaylightStore {
       try {await save();}
       catch(error) {
         try {await this.storage.moveRoot(previous);}
-        catch {throw new Error(`設定を保存できず、フォルダは ${this.storage.root} に移動済みです。配置場所を確認してください。`);}
+        catch {throw new Error(t("設定を保存できず、フォルダは {0} に移動済みです。配置場所を確認してください。", this.storage.root));}
         throw error;
       }
     } finally {this.storageChanging=false;this.invalidate();}
@@ -205,7 +208,7 @@ export class DaylightStore {
     for (const item of rows.filter(i => i.sortOrder == null)) {
       const value = orderBetween(last, null, this.sortOrderGap);
       await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
-        if (String(fm.status ?? '').trim() !== status || (fm.sort_order != null && fm.sort_order !== '')) throw new Error('タスクが更新されています。もう一度お試しください。');
+        if (String(fm.status ?? '').trim() !== status || (fm.sort_order != null && fm.sort_order !== '')) throw new Error(t("タスクが更新されています。もう一度お試しください。"));
         const previous = fm.sort_order; fm.sort_order = value;
         this.orderOverrides.set(item.path, {value, previous});
       });
@@ -222,13 +225,13 @@ export class DaylightStore {
       await this.initializeOrder(item.status);
       const rows = orderedTasks(this.items().filter(i => i.kind === 'task' && i.status === item.status && i.path !== item.path));
       const index = rows.findIndex(i => i.path === anchorPath);
-      if (index < 0) throw new Error('移動先のタスクが更新されています。もう一度お試しください。');
+      if (index < 0) throw new Error(t("移動先のタスクが更新されています。もう一度お試しください。"));
       const position = index + (side === 'after' ? 1 : 0);
       const value = orderBetween(rows[position-1]?.sortOrder ?? null, rows[position]?.sortOrder ?? null, this.sortOrderGap);
       const current = this.items().find(i => i.path === item.path);
-      if (!current || current.status !== item.status) throw new Error('タスクの状態が更新されています。');
+      if (!current || current.status !== item.status) throw new Error(t("タスクの状態が更新されています。"));
       await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
-        if (String(fm.status ?? '').trim() !== item.status || fm.sort_order !== current.sortOrder) throw new Error('タスクが更新されています。もう一度お試しください。');
+        if (String(fm.status ?? '').trim() !== item.status || fm.sort_order !== current.sortOrder) throw new Error(t("タスクが更新されています。もう一度お試しください。"));
         const previous = fm.sort_order; fm.sort_order = value; this.orderOverrides.set(item.path,{value,previous});
       });
       this.invalidate(item.path);
@@ -245,13 +248,13 @@ export class DaylightStore {
     if (valueKey !== previousKey) this.workOverrides.set(path, { sessions, taskStart, taskEnd, valueKey, previousKey });
   }
   async setStatus(item: Item, status: string) {
-    if (!isStatus(status)) throw new Error('状態を選択してください。');
+    if (!isStatus(status)) throw new Error(t("状態を選択してください。"));
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
       const order = item.kind === 'task' && item.status !== status ? await this.appendOrder(status, item.path) : null;
       const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
       let updatedWork: Record<string, unknown> | null = null;
       await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
-        if (String(fm.status ?? '').trim() !== item.status) throw new Error('状態が更新されています。再度選択してください。');
+        if (String(fm.status ?? '').trim() !== item.status) throw new Error(t("状態が更新されています。再度選択してください。"));
         const previous=fm.status;
         fm.status = status;
         if (order !== null) { this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order}); fm.sort_order=order; }
@@ -262,8 +265,8 @@ export class DaylightStore {
     }));
   }
   async startTask(item: Item) {
-    if (item.kind !== 'task' || item.status === 'done' || item.status === 'cancelled') throw new Error('開始できるタスクを選び直してください。');
-    if (isTaskRunning(item)) throw new Error('すでに開始しています。');
+    if (item.kind !== 'task' || item.status === 'done' || item.status === 'cancelled') throw new Error(t("開始できるタスクを選び直してください。"));
+    if (isTaskRunning(item)) throw new Error(t("すでに開始しています。"));
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
       const order = item.status !== 'on_going' ? await this.appendOrder('on_going',item.path) : null;
       const file=this.file(item.path);
@@ -274,8 +277,8 @@ export class DaylightStore {
         const yaml={parse:parseYaml,stringify:stringifyYaml};
         const {fm,body,newline}=taskDocument(content,yaml);
         const currentSessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
-        if (fm.status !== item.status || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error('タスクが更新されています。開き直してください。');
-        if (fm.status === 'on_going' && isFrontmatterRunning(fm)) throw new Error('すでに開始しています。');
+        if (fm.status !== item.status || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error(t("タスクが更新されています。開き直してください。"));
+        if (fm.status === 'on_going' && isFrontmatterRunning(fm)) throw new Error(t("すでに開始しています。"));
         const now=Date.now();
         const previous=fm.status;
         fm.status='on_going';if(order !== null){this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order});fm.sort_order=order;}recordWorkStatus(fm,previous,now);fm['completed at']=null;
@@ -287,14 +290,14 @@ export class DaylightStore {
     }));
   }
   async pauseTask(item: Item) {
-    if (item.kind !== 'task' || !isTaskRunning(item)) throw new Error('実行中のタスクを選び直してください。');
+    if (item.kind !== 'task' || !isTaskRunning(item)) throw new Error(t("実行中のタスクを選び直してください。"));
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
       const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
       let updatedWork: Record<string, unknown> | null = null;
       await this.app.vault.process(this.file(item.path), content => {
         const {fm,body,newline}=taskDocument(content,{parse:parseYaml,stringify:stringifyYaml});
         const currentSessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
-        if (fm.status !== 'on_going' || !isFrontmatterRunning(fm) || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error('タスクが更新されています。開き直してください。');
+        if (fm.status !== 'on_going' || !isFrontmatterRunning(fm) || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error(t("タスクが更新されています。開き直してください。"));
         pauseWork(fm, Date.now());
         updatedWork = { ...fm };
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
@@ -304,7 +307,7 @@ export class DaylightStore {
     }));
   }
   async finishTask(item: Item) {
-    if (item.kind !== 'task' || item.status !== 'on_going') throw new Error('実行中のタスクを選び直してください。');
+    if (item.kind !== 'task' || item.status !== 'on_going') throw new Error(t("実行中のタスクを選び直してください。"));
     await this.queue('__event_mutations__', () => this.queue(item.path, async () => {
       const order = await this.appendOrder('done',item.path);
       const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
@@ -312,7 +315,7 @@ export class DaylightStore {
       await this.app.vault.process(this.file(item.path), content => {
         const {fm,body,newline}=taskDocument(content,{parse:parseYaml,stringify:stringifyYaml});
         const currentSessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
-        if (fm.status !== 'on_going' || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error('タスクが更新されています。開き直してください。');
+        if (fm.status !== 'on_going' || this.workKey(currentSessions, dateTime(fm.task_start), dateTime(fm.task_end)) !== previousKey) throw new Error(t("タスクが更新されています。開き直してください。"));
         fm.status='done';this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order});fm.sort_order=order;recordWorkStatus(fm,'on_going');
         updatedWork = { ...fm };
         return `---${newline}${stringifyYaml(fm).trimEnd().replace(/\r?\n/g,newline)}${newline}---${newline}${body}`;
@@ -335,20 +338,20 @@ export class DaylightStore {
     const tags = (Array.isArray(fm?.tags) ? fm.tags : typeof fm?.tags === 'string' ? fm.tags.split(/[,\s]+/) : [])
       .filter((t: unknown): t is string => typeof t === 'string').map((t: string) => t.replace(/^#/, ''));
     const kinds = (['task', 'project', 'event'] as const).filter(k => tags.includes(k));
-    if (kinds.length !== 1 || kinds[0] === 'event') throw new Error('タスクまたはプロジェクトのノートを選び直してください。');
+    if (kinds.length !== 1 || kinds[0] === 'event') throw new Error(t("タスクまたはプロジェクトのノートを選び直してください。"));
     return kinds[0];
   }
   async loadDeleteSnapshot(item: Item): Promise<DeleteSnapshot> {
     const content = await this.app.vault.read(this.file(item.path));
     const kind = this.deletionKind(content);
-    if (kind !== item.kind) throw new Error('ノートの種類が変わっています。詳細を開き直してください。');
+    if (kind !== item.kind) throw new Error(t("ノートの種類が変わっています。詳細を開き直してください。"));
     return { path: item.path, kind, content };
   }
   async deleteNote(snapshot: DeleteSnapshot) {
     await this.queue('__event_mutations__', () => this.queue(snapshot.path, async () => {
       const file = this.file(snapshot.path), content = await this.app.vault.read(file);
-      if (content !== snapshot.content) throw new Error('ノートが更新されています。削除画面を開き直してください。');
-      if (this.deletionKind(content) !== snapshot.kind) throw new Error('ノートの種類が変わっています。');
+      if (content !== snapshot.content) throw new Error(t("ノートが更新されています。削除画面を開き直してください。"));
+      if (this.deletionKind(content) !== snapshot.kind) throw new Error(t("ノートの種類が変わっています。"));
       await this.app.fileManager.trashFile(file);
       this.overrides.delete(snapshot.path); this.invalidate();
     }));
@@ -357,7 +360,7 @@ export class DaylightStore {
   private projectLink(path: string): string {
     if (!path) return '';
     const project = this.items().find(i => i.kind === 'project' && i.path === path);
-    if (!project) throw new Error('プロジェクトを選び直してください。');
+    if (!project) throw new Error(t("プロジェクトを選び直してください。"));
     return `[[${this.file(project.path).path.replace(/\.md$/, '')}]]`;
   }
   private uniqueEventPath(stem: string, kind: Kind, currentPath = ''): string {
@@ -365,7 +368,7 @@ export class DaylightStore {
       const candidate = `${this.storage.folder(kind)}/${stem}${suffix ? ` ${suffix}` : ''}.md`;
       if (candidate === currentPath || !this.app.vault.getAbstractFileByPath(candidate)) return candidate;
     }
-    throw new Error('重複しないノート名を確保できませんでした。');
+    throw new Error(t("重複しないノート名を確保できませんでした。"));
   }
   async loadTask(path:string):Promise<TaskSnapshot> {
     const file=this.file(path),{fm}=taskDocument(await this.app.vault.read(file),{parse:parseYaml,stringify:stringifyYaml});
@@ -375,14 +378,14 @@ export class DaylightStore {
   }
   private taskReference(value:unknown,kind:'project'|'task',source:string):string|null {
     if(value===null||value==='')return null;
-    if(typeof value!=='string')throw new Error('リンク先を選択してください。');
+    if(typeof value!=='string')throw new Error(t("リンク先を選択してください。"));
     const match=value.match(/^\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]$/);
     const target=match?this.app.metadataCache.getFirstLinkpathDest(match[1],source):null;
-    if(!target||!this.items().some(i=>i.path===target.path&&i.kind===kind))throw new Error(kind==='project'?'プロジェクトを選び直してください。':'親タスクを選び直してください。');
+    if(!target||!this.items().some(i=>i.path===target.path&&i.kind===kind))throw new Error(kind==='project'?t("プロジェクトを選び直してください。"):t("親タスクを選び直してください。"));
     if(kind==='task') {
       const seen=new Set([source]);let parent:TFile|null=target;
       while(parent) {
-        if(seen.has(parent.path))throw new Error('親タスクの関係が循環しています。');
+        if(seen.has(parent.path))throw new Error(t("親タスクの関係が循環しています。"));
         seen.add(parent.path);
         const raw:unknown=this.app.metadataCache.getFileCache(parent)?.frontmatter?.parent_task;
         const link:RegExpMatchArray|null=typeof raw==='string'?raw.match(/^\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]$/):null;
@@ -398,20 +401,20 @@ export class DaylightStore {
     while (raw) {
       const match=raw.match(/^\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]$/);
       const file=match ? this.app.metadataCache.getFirstLinkpathDest(match[1],context) : null;
-      if (!file) throw new Error('親タスクのリンク先を確認してください。');
-      if (seen.has(file.path)) throw new Error('親タスクの関係が循環しています。');
+      if (!file) throw new Error(t("親タスクのリンク先を確認してください。"));
+      if (seen.has(file.path)) throw new Error(t("親タスクの関係が循環しています。"));
       seen.add(file.path);
       const {fm}=taskDocument(await this.app.vault.read(this.file(file.path)),{parse:parseYaml,stringify:stringifyYaml});
       raw=typeof fm.parent_task === 'string' ? fm.parent_task : '';context=file.path;
     }
   }
   async setTaskProject(item: Item, projectPath: string) {
-    if (item.kind !== 'task') throw new Error('タスクを選択してください。');
+    if (item.kind !== 'task') throw new Error(t("タスクを選択してください。"));
     const snapshot = await this.loadTask(item.path);
     await this.updateTask(snapshot, { project: projectPath ? `[[${projectPath.replace(/\.md$/, '')}]]` : null });
   }
   async setParentTask(item: Item, parentPath: string) {
-    if (item.kind !== 'task') throw new Error('タスクを選択してください。');
+    if (item.kind !== 'task') throw new Error(t("タスクを選択してください。"));
     const snapshot=await this.loadTask(item.path);
     await this.updateTask(snapshot,{parent_task:parentPath ? `[[${parentPath.replace(/\.md$/,'')}]]` : null});
   }
@@ -436,9 +439,9 @@ export class DaylightStore {
       try { if(destination!==file.path)await this.app.fileManager.renameFile(file,destination); }
       catch(error) {
         if(file.path===snapshot.path) {
-          try { await this.app.vault.process(file,latest=>{if(latest!==updated)throw new Error('別の編集があります。');return previous;}); }
-          catch {this.invalidate();throw new Error('内容の一部は保存済みです。ノートを開き直して確認してください。');}
-        } else {this.invalidate();throw new Error('名前変更後の処理を完了できませんでした。ノートを開き直してください。');}
+          try { await this.app.vault.process(file,latest=>{if(latest!==updated)throw new Error(t("別の編集があります。"));return previous;}); }
+          catch {this.invalidate();throw new Error(t("内容の一部は保存済みです。ノートを開き直して確認してください。"));}
+        } else {this.invalidate();throw new Error(t("名前変更後の処理を完了できませんでした。ノートを開き直してください。"));}
         this.invalidate();throw error;
       }
       this.overrides.delete(snapshot.path);this.workOverrides.delete(snapshot.path);this.invalidate();result=file;
@@ -468,14 +471,14 @@ export class DaylightStore {
     let result: TFile | undefined;
     await this.queue('__event_mutations__', () => this.queue(snapshot.path, async () => {
       const file = this.file(snapshot.path);
-      if (await this.app.vault.read(file) !== snapshot.content) throw new Error('ノートが更新されています。予定を開き直してください。');
+      if (await this.app.vault.read(file) !== snapshot.content) throw new Error(t("ノートが更新されています。予定を開き直してください。"));
       const { fm } = eventDocument(snapshot.content, { parse: parseYaml, stringify: stringifyYaml });
       const project = input.projectPath === KEEP_PROJECT ? fm.project : this.projectLink(input.projectPath) || null;
       const updated = updateEventDocument(snapshot.content, input, project, { parse: parseYaml, stringify: stringifyYaml }, `${dayKey()} ${timeLabel(Date.now())}`);
       const rename = checked.title !== snapshot.input.title || checked.start.slice(0,10) !== dateValue(fm.target_date);
       const destination = rename ? this.uniqueEventPath(`${checked.title} ${checked.start.slice(0,10)}`, 'event', file.path) : file.path;
       await this.app.vault.process(file, latest => {
-        if (latest !== snapshot.content) throw new Error('ノートが更新されています。予定を開き直してください。');
+        if (latest !== snapshot.content) throw new Error(t("ノートが更新されています。予定を開き直してください。"));
         return updated;
       });
       try {
@@ -485,11 +488,11 @@ export class DaylightStore {
         if (file.path === snapshot.path) {
           try {
             await this.app.vault.process(file, latest => {
-              if (latest !== updated) throw new Error('別の編集があるため復元できません。');
+              if (latest !== updated) throw new Error(t("別の編集があるため復元できません。"));
               return snapshot.content;
             });
-          } catch { this.invalidate(); throw new Error('内容の一部は保存済みです。ノートを開き直して確認してください。'); }
-        } else { this.invalidate(); throw new Error('名前変更後の処理を完了できませんでした。ノートを開き直して確認してください。'); }
+          } catch { this.invalidate(); throw new Error(t("内容の一部は保存済みです。ノートを開き直して確認してください。")); }
+        } else { this.invalidate(); throw new Error(t("名前変更後の処理を完了できませんでした。ノートを開き直して確認してください。")); }
         this.invalidate(); throw error;
       }
       this.overrides.delete(snapshot.path); this.invalidate(); result = file;
@@ -499,7 +502,7 @@ export class DaylightStore {
   async deleteEvent(snapshot: EventSnapshot) {
     await this.queue('__event_mutations__', () => this.queue(snapshot.path, async () => {
       const file = this.file(snapshot.path), content = await this.app.vault.read(file);
-      if (content !== snapshot.content) throw new Error('ノートが更新されています。予定を開き直してください。');
+      if (content !== snapshot.content) throw new Error(t("ノートが更新されています。予定を開き直してください。"));
       eventDocument(content, { parse: parseYaml, stringify: stringifyYaml });
       await this.app.fileManager.trashFile(file);
       this.overrides.delete(snapshot.path); this.invalidate();
@@ -510,7 +513,7 @@ export class DaylightStore {
     await this.queue('__event_mutations__', async () => {
       const name = kind === 'task' ? 'Task' : 'Project';
       const template = this.app.vault.getAbstractFileByPath(this.storage.template(kind));
-      if (!(template instanceof TFile)) throw new Error(`${name}テンプレートが見つかりません。`);
+      if (!(template instanceof TFile)) throw new Error(t("{0}テンプレートが見つかりません。", name));
       const values = properties();
       if (kind === 'task' && typeof values.status === 'string') values.sort_order = await this.appendOrder(values.status);
       const content = renderCreatedNote(await this.app.vault.read(template), kind, values, memo, dayKey(), { parse: parseYaml, stringify: stringifyYaml }, goal);
@@ -520,7 +523,7 @@ export class DaylightStore {
         try { result = await this.app.vault.create(path, content); break; }
         catch (error) { if (!this.app.vault.getAbstractFileByPath(path)) throw error; }
       }
-      if (!result) throw new Error('重複しないノート名を確保できませんでした。');
+      if (!result) throw new Error(t("重複しないノート名を確保できませんでした。"));
       this.invalidate();
     });
     return result!;
@@ -544,7 +547,7 @@ export class DaylightStore {
     let result: TFile | undefined;
     await this.queue('__event_mutations__', async () => {
       const template = this.app.vault.getAbstractFileByPath(this.storage.template('event'));
-      if (!(template instanceof TFile)) throw new Error('Eventテンプレートが見つかりません。');
+      if (!(template instanceof TFile)) throw new Error(t("Eventテンプレートが見つかりません。"));
       const projectLink = this.projectLink(input.projectPath);
       const content = renderEvent(await this.app.vault.read(template), input, projectLink, dayKey(), { parse: parseYaml, stringify: stringifyYaml });
       const stem = `${checked.title} ${checked.start.slice(0, 10)}`;
@@ -557,7 +560,7 @@ export class DaylightStore {
           if (!this.app.vault.getAbstractFileByPath(path)) throw error;
         }
       }
-      if (!result) throw new Error('重複しないノート名を確保できませんでした。');
+      if (!result) throw new Error(t("重複しないノート名を確保できませんでした。"));
       this.invalidate();
     });
     return result!;

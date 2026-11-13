@@ -1,3 +1,5 @@
+import * as i18n from '../src/i18n';
+i18n.setLanguage('ja');
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -6,12 +8,12 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 class TFile {constructor(public path:string,public content=''){} }
 class TFolder {constructor(public path:string){} }
-const compiled=build({entryPoints:[path.resolve('src/storage.ts'),path.resolve('src/store.ts')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',loader:{'.md':'text'},external:['obsidian']});
+const compiled=build({entryPoints:[path.resolve('src/storage.ts'),path.resolve('src/store.ts')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',loader:{'.md':'text'},external:['./i18n','obsidian']});
 async function fixture(){
   const files=new Map<string,TFile|TFolder>(),renames:string[][]=[];
   const app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getAbstractFileByPath:(p:string)=>files.get(p),createFolder:async(p:string)=>{if(files.has(p))throw new Error('exists');const f=new TFolder(p);files.set(p,f);return f;},create:async(p:string,c:string)=>{if(files.has(p))throw new Error('exists');const f=new TFile(p,c);files.set(p,f);return f;}},fileManager:{renameFile:async(f:TFolder,next:string)=>{if(files.has(next))throw new Error('exists');const old=f.path;renames.push([old,next]);for(const [key,value]of [...files])if(key===old||key.startsWith(old+'/')){files.delete(key);value.path=next+key.slice(old.length);files.set(value.path,value);}}}};
   const require=createRequire(path.join(process.cwd(),'package.json'));
-  const modules=(await compiled).outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='obsidian'?{TFile,TFolder}:require(id),console,Intl,Date});return module.exports;});
+  const modules=(await compiled).outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder}:require(id),console,Intl,Date});return module.exports;});
   return {files,renames,app,storage:new modules[0].DaylightStorage(app),Storage:modules[0].DaylightStorage,Store:modules[1].DaylightStore,normalize:modules[0].storageRoot};
 }
 test('first install creates all folders and complete bundled templates without overwriting edits',async()=>{

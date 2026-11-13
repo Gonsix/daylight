@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { Kind } from './model';
 import taskTemplate from '../templates/Task.md';
@@ -9,7 +10,7 @@ const FOLDERS: Record<Kind,string> = { task:'Tasks', event:'Events', project:'Pr
 const TEMPLATES = { Task:taskTemplate, Event:eventTemplate, Project:projectTemplate };
 export function storageRoot(value: string): string {
   const path=value.trim().replace(/\\/g,'/').replace(/\/+/g,'/').replace(/^\/|\/$/g,'');
-  if (!path || /[:*?"<>|\x00-\x1f]/.test(path) || path.split('/').some(p=>p.startsWith('.') || !p)) throw new Error('Vault内のフォルダを指定してください（例: Daylight / etc/Daylight）。');
+  if (!path || /[:*?"<>|\x00-\x1f]/.test(path) || path.split('/').some(p=>p.startsWith('.') || !p)) throw new Error(t("Vault内のフォルダを指定してください（例: Daylight / etc/Daylight）。"));
   return path;
 }
 export async function ensureFolder(app: App, path: string): Promise<void> {
@@ -17,7 +18,7 @@ export async function ensureFolder(app: App, path: string): Promise<void> {
   for (const part of path.split('/')) {
     current=current ? `${current}/${part}` : part;
     const file=app.vault.getAbstractFileByPath(current);
-    if(file) {if(!(file instanceof TFolder))throw new Error(`${current} に同名のファイルがあります。`);continue;}
+    if(file) {if(!(file instanceof TFolder))throw new Error(t("{0} に同名のファイルがあります。", current));continue;}
     try {await app.vault.createFolder(current);}
     catch(error) {if(!(app.vault.getAbstractFileByPath(current) instanceof TFolder))throw error;}
   }
@@ -44,7 +45,7 @@ export class DaylightStorage {
     for(const path of [this.root,...Object.values(FOLDERS).map(f=>`${this.root}/${f}`),`${this.root}/Templates`])await ensureFolder(this.app,path);
     for(const [name,content] of Object.entries(TEMPLATES)) {
       const path=`${this.root}/Templates/${name}.md`,file=this.app.vault.getAbstractFileByPath(path);
-      if(file) {if(!(file instanceof TFile))throw new Error(`${path} に同名のフォルダがあります。`);continue;}
+      if(file) {if(!(file instanceof TFile))throw new Error(t("{0} に同名のフォルダがあります。", path));continue;}
       try {await this.app.vault.create(path,content);}
       catch(error) {if(!(this.app.vault.getAbstractFileByPath(path) instanceof TFile))throw error;}
     }
@@ -52,10 +53,10 @@ export class DaylightStorage {
   async moveRoot(value: string) {
     const next=storageRoot(value);
     if(next===this.root)return;
-    if(next.startsWith(this.root+'/'))throw new Error('現在のDaylightフォルダの中へは移動できません。');
-    if(this.app.vault.getAbstractFileByPath(next))throw new Error('移動先に同名のファイルまたはフォルダがあります。別の場所を指定してください。');
+    if(next.startsWith(this.root+'/'))throw new Error(t("現在のDaylightフォルダの中へは移動できません。"));
+    if(this.app.vault.getAbstractFileByPath(next))throw new Error(t("移動先に同名のファイルまたはフォルダがあります。別の場所を指定してください。"));
     const folder=this.app.vault.getAbstractFileByPath(this.root);
-    if(!(folder instanceof TFolder))throw new Error('現在のDaylightフォルダが見つかりません。');
+    if(!(folder instanceof TFolder))throw new Error(t("現在のDaylightフォルダが見つかりません。"));
     const parent=next.split('/').slice(0,-1).join('/');if(parent)await ensureFolder(this.app,parent);
     await this.app.fileManager.renameFile(folder,next);
     this.root=next;

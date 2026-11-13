@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { Item } from './model';
 
 export function orderedTasks(items: Item[]): Item[] {
@@ -11,6 +12,6 @@ export function orderedTasks(items: Item[]): Item[] {
 }
 export function orderBetween(before: number | null, after: number | null, gap: number): number {
   const value = before === null ? (after === null ? gap : after-gap) : after === null ? before+gap : before+Math.floor((after-before)/2);
-  if (!Number.isSafeInteger(value) || (before !== null && value <= before) || (after !== null && value >= after)) throw new Error('並び順の間隔が不足しています。近くのタスクのsort_orderを調整してください。');
+  if (!Number.isSafeInteger(value) || (before !== null && value <= before) || (after !== null && value >= after)) throw new Error(t("並び順の間隔が不足しています。近くのタスクのsort_orderを調整してください。"));
   return value;
 }

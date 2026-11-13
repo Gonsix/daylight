@@ -1,3 +1,5 @@
+import * as i18n from '../src/i18n';
+i18n.setLanguage('ja');
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -19,12 +21,12 @@ class Folder {
     return [...paths.filter(f => !f.path.slice(prefix.length).includes('/')), ...[...dirs].map(dir => new Folder(prefix + dir, this.files))];
   }
 }
-const compiled = build({loader:{'.md':'text'}, entryPoints: [path.resolve('src/store.ts')], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['obsidian'] });
+const compiled = build({loader:{'.md':'text'}, entryPoints: [path.resolve('src/store.ts')], bundle: true, write: false, format: 'cjs', platform: 'node', external: ['./i18n', 'obsidian'] });
 async function fixture() {
   const module = { exports: {} as any };
   const require = createRequire(path.join(process.cwd(), 'package.json'));
   vm.runInNewContext((await compiled).outputFiles[0].text, { module, exports: module.exports,
-    require: (id: string) => id === 'obsidian' ? { TFile: File, TFolder: Folder,
+    require: (id: string) => id === './i18n' ? i18n : id === 'obsidian' ? { TFile: File, TFolder: Folder,
       parseYaml: (source:string) => source.trim().startsWith('{') ? JSON.parse(source) : ({ tags:['event'],status:'todo','created at':'','last updated':null }),
       stringifyYaml: JSON.stringify,
     } : require(id), Intl, Date, console });

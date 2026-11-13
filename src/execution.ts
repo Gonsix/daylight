@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { dateTime, formatDuration, Item, itemSessions, localTimestamp, parseWorkSessions, recordTaskCompletion, WorkSession } from './model';
 
 export function isFrontmatterRunning(fm: Record<string, unknown>): boolean {
@@ -36,8 +37,8 @@ export function pauseWork(fm: Record<string, unknown>, now = Date.now()) {
   const sessions = parseWorkSessions(fm.task_sessions, fm.task_start, fm.task_end);
   const last = sessions[sessions.length - 1];
   const fmStart = dateTime(fm.task_start);
-  if (!last || last.end !== null) throw new Error('実行中のタスクを選び直してください。');
-  if (now < last.start || (fmStart !== null && now < fmStart)) throw new Error('作業終了が開始時刻より前になっています。');
+  if (!last || last.end !== null) throw new Error(t("実行中のタスクを選び直してください。"));
+  if (now < last.start || (fmStart !== null && now < fmStart)) throw new Error(t("作業終了が開始時刻より前になっています。"));
   last.end = now;
   syncWorkFields(fm, sessions);
 }
@@ -50,7 +51,7 @@ export function recordWorkStatus(fm: Record<string, unknown>, previous: unknown,
     const last = sessions[sessions.length - 1];
     const fmStart = dateTime(fm.task_start);
     if (last && last.end === null) {
-      if (last.start > now || (fmStart !== null && fmStart > now)) throw new Error('作業開始が現在より後になっています。');
+      if (last.start > now || (fmStart !== null && fmStart > now)) throw new Error(t("作業開始が現在より後になっています。"));
     } else {
       sessions.push({ start: now, end: null });
     }
@@ -60,7 +61,7 @@ export function recordWorkStatus(fm: Record<string, unknown>, previous: unknown,
     const last = sessions[sessions.length - 1];
     const fmStart = dateTime(fm.task_start);
     if (last && last.end === null) {
-      if (now < last.start || (fmStart !== null && now < fmStart)) throw new Error('作業終了が開始時刻より前になっています。');
+      if (now < last.start || (fmStart !== null && now < fmStart)) throw new Error(t("作業終了が開始時刻より前になっています。"));
       last.end = now;
       syncWorkFields(fm, sessions);
     } else if (sessions.length > 0) {

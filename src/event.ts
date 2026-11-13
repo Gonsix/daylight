@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { appendMemo, dateTime, dayKey, dayStart, isStatus, Status, timeLabel, validDay } from './model';
 
 export interface TimeRange { start: number; end: number; }
@@ -20,7 +21,7 @@ export function adjustRange(range: TimeRange, action: RangeAction, anchor: numbe
   return { start, end: start + duration };
 }
 export function rangeDateTimes(day: string, range: TimeRange) {
-  if (!validDay(day)) throw new Error('日付を確認してください。');
+  if (!validDay(day)) throw new Error(t("日付を確認してください。"));
   const format = (minute: number) => {
     const time = dayStart(day) + minute * 60000;
     return `${dayKey(time)}T${timeLabel(time)}`;
@@ -36,14 +37,14 @@ export interface EventSnapshot {
 }
 export function validateEvent(input: EventInput): { title: string; start: string; end: string; status: Status } {
   const title = input.title.trim();
-  if (!title) throw new Error('タイトルを入力してください。');
-  if (/[\\/:*?"<>|#^\[\]\x00-\x1f]/.test(title) || /\.$/.test(title)) throw new Error('タイトルにファイル名で使えない記号が含まれています。');
-  if (title.length > 120) throw new Error('タイトルは120文字以内にしてください。');
+  if (!title) throw new Error(t("タイトルを入力してください。"));
+  if (/[\\/:*?"<>|#^\[\]\x00-\x1f]/.test(title) || /\.$/.test(title)) throw new Error(t("タイトルにファイル名で使えない記号が含まれています。"));
+  if (title.length > 120) throw new Error(t("タイトルは120文字以内にしてください。"));
   const start = dateTime(input.start), end = dateTime(input.end);
-  if (start === null || end === null) throw new Error('開始・終了日時を入力してください。');
-  if (start % 60000 || end % 60000) throw new Error('時刻は1分単位で指定してください。');
-  if (end <= start) throw new Error('終了日時は開始日時より後にしてください。');
-  if (!isStatus(input.status)) throw new Error('状態を選択してください。');
+  if (start === null || end === null) throw new Error(t("開始・終了日時を入力してください。"));
+  if (start % 60000 || end % 60000) throw new Error(t("時刻は1分単位で指定してください。"));
+  if (end <= start) throw new Error(t("終了日時は開始日時より後にしてください。"));
+  if (!isStatus(input.status)) throw new Error(t("状態を選択してください。"));
   const format = (time: number) => `${dayKey(time)}T${timeLabel(time)}:00`;
   return { title, start: format(start), end: format(end), status: input.status };
 }
@@ -51,12 +52,12 @@ export function validateEvent(input: EventInput): { title: string; start: string
 export interface YamlAdapter { parse: (source: string) => any; stringify: (value: any) => string; }
 export function eventDocument(content: string, yaml: YamlAdapter) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) throw new Error('予定ノートのフロントマターを確認してください。');
+  if (!match) throw new Error(t("予定ノートのフロントマターを確認してください。"));
   const fm = yaml.parse(match[1]);
-  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error('予定ノートの属性を確認してください。');
+  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error(t("予定ノートの属性を確認してください。"));
   const tags = (Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [])
     .filter((t: unknown): t is string => typeof t === 'string').map((t: string) => t.replace(/^#/, ''));
-  if (!tags.includes('event') || tags.includes('task') || tags.includes('project')) throw new Error('予定ノートではないため編集できません。');
+  if (!tags.includes('event') || tags.includes('task') || tags.includes('project')) throw new Error(t("予定ノートではないため編集できません。"));
   return { fm, body: content.slice(match[0].length), newline: content.includes('\r\n') ? '\r\n' : '\n' };
 }
 export function updateEventDocument(content: string, input: EventInput, project: unknown, yaml: YamlAdapter, stamp: string): string {
@@ -73,11 +74,11 @@ export function renderEvent(template: string, input: EventInput, projectLink: st
   const expanded = template
     .replace(/<%\s*(["'])---\1\s*%>/g, '---')
     .replace(/<%\s*tp\.file\.creation_date\((["'])YYYY-MM-DD\1\)\s*%>/g, createdDay);
-  if (expanded.includes('<%')) throw new Error('Eventテンプレートに未対応のTemplater式があります。');
+  if (expanded.includes('<%')) throw new Error(t("Eventテンプレートに未対応のTemplater式があります。"));
   const match = expanded.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) throw new Error('Eventテンプレートのフロントマターを確認してください。');
+  if (!match) throw new Error(t("Eventテンプレートのフロントマターを確認してください。"));
   const fm = yaml.parse(match[1]);
-  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error('Eventテンプレートの属性を確認してください。');
+  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error(t("Eventテンプレートの属性を確認してください。"));
   const tags = Array.isArray(fm.tags) ? fm.tags.filter((tag: unknown): tag is string => typeof tag === 'string') : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [];
   fm.tags = Array.from(new Set([...tags.filter((tag: string) => !['task', 'project', '#task', '#project'].includes(tag)), 'event']));
   fm['created at'] = createdDay;

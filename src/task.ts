@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { dateTime, dayKey, isStatus, localTimestamp, parseWorkSessions, timeLabel, validDay, WorkSession } from './model';
 import { recordWorkStatus, serializeWorkSessions, syncWorkFields } from './execution';
 import { YamlAdapter } from './event';
@@ -6,18 +7,18 @@ export interface TaskSnapshot { path: string; properties: Record<string, unknown
 export type PropertyChanges = Record<string, unknown>;
 export const TASK_FIELDS = ['status','completed at','target_date','schedule_start','schedule_end','task_start','task_end','task_sessions','due','project','parent_task'];
 export const PROPERTY_LABELS: Record<string,string> = {
-  status:'状態',target_date:'予定日',schedule_start:'開始',schedule_end:'終了',due:'締切',project:'プロジェクト',parent_task:'親タスク',
-  tags:'タグ',aliases:'別名','created at':'作成日','last updated':'更新日時',
-  'completed at':'完了日時', task_start:'作業開始', task_end:'作業終了', task_sessions:'作業セッション',
+  get status() { return t("状態"); },get target_date() { return t("予定日"); },get schedule_start() { return t("開始"); },get schedule_end() { return t("終了"); },get due() { return t("締切"); },get project() { return t("プロジェクト"); },get parent_task() { return t("親タスク"); },
+  get tags() { return t("タグ"); },get aliases() { return t("別名"); },get 'created at'() { return t("作成日"); },get 'last updated'() { return t("更新日時"); },
+  get 'completed at'() { return t("完了日時"); }, get task_start() { return t("作業開始"); }, get task_end() { return t("作業終了"); }, get task_sessions() { return t("作業セッション"); },
 };
 export function taskDocument(content: string, yaml: YamlAdapter) {
   const match=content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if(!match)throw new Error('タスクのフロントマターを確認してください。');
+  if(!match)throw new Error(t("タスクのフロントマターを確認してください。"));
   const fm=yaml.parse(match[1]);
-  if(!fm || typeof fm!=='object' || Array.isArray(fm))throw new Error('タスクの属性を確認してください。');
+  if(!fm || typeof fm!=='object' || Array.isArray(fm))throw new Error(t("タスクの属性を確認してください。"));
   const tags=(Array.isArray(fm.tags)?fm.tags:typeof fm.tags==='string'?fm.tags.split(/[,\s]+/):[])
     .filter((t:unknown):t is string=>typeof t==='string').map((t:string)=>t.replace(/^#/,''));
-  if(!tags.includes('task')||tags.includes('event')||tags.includes('project'))throw new Error('タスクノートではないため編集できません。');
+  if(!tags.includes('task')||tags.includes('event')||tags.includes('project'))throw new Error(t("タスクノートではないため編集できません。"));
   return {fm:fm as Record<string,unknown>,body:content.slice(match[0].length),newline:content.includes('\r\n')?'\r\n':'\n'};
 }
 export function localDateTime(value: unknown): string {
@@ -49,26 +50,26 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
   const equal=(a:unknown,b:unknown)=>yaml.stringify({value:a})===yaml.stringify({value:b});
   const keys=Object.keys(changes).filter(k=>!equal(changes[k],snapshot.properties[k]));
   for(const key of keys) {
-    if(!key.trim()||/[\r\n\0]/.test(key))throw new Error('プロパティ名を確認してください。');
-    if(!equal(fm[key],snapshot.properties[key]))throw new Error(`${PROPERTY_LABELS[key]||key}が更新されています。再読み込みしてください。`);
+    if(!key.trim()||/[\r\n\0]/.test(key))throw new Error(t("プロパティ名を確認してください。"));
+    if(!equal(fm[key],snapshot.properties[key]))throw new Error(t("{0}が更新されています。再読み込みしてください。", PROPERTY_LABELS[key]||key));
   }
   const next=Object.fromEntries([...Object.entries(fm),...keys.map(key=>[key,changes[key]])]);
-  if(keys.includes('status') && (typeof next.status!=='string'||!isStatus(next.status)))throw new Error('状態を選択してください。');
+  if(keys.includes('status') && (typeof next.status!=='string'||!isStatus(next.status)))throw new Error(t("状態を選択してください。"));
   if(keys.includes('target_date')) {
     if(next.target_date===null||next.target_date==='')next.target_date=null;
-    else if(typeof next.target_date!=='string'||!validDay(next.target_date))throw new Error('予定日を確認してください。');
+    else if(typeof next.target_date!=='string'||!validDay(next.target_date))throw new Error(t("予定日を確認してください。"));
   }
   for(const key of ['schedule_start','schedule_end','task_start','task_end','due','completed at'])if(keys.includes(key)) {
     if(next[key]===null||next[key]==='')next[key]=null;
     else {
-      const time=dateTime(next[key]);if(time===null)throw new Error(`${PROPERTY_LABELS[key]}は日付と時刻を指定してください。`);
+      const time=dateTime(next[key]);if(time===null)throw new Error(t("{0}は日付と時刻を指定してください。", PROPERTY_LABELS[key]));
       const seconds=Math.floor(time%60000/1000);
       next[key]=`${dayKey(time)}T${timeLabel(time)}:${String(seconds).padStart(2,'0')}`;
     }
   }
   if(keys.some(k=>['schedule_start','schedule_end'].includes(k))) {
     const start=dateTime(next.schedule_start),end=dateTime(next.schedule_end);
-    if(start!==null&&end!==null&&end<=start)throw new Error('終了日時は開始日時より後にしてください。');
+    if(start!==null&&end!==null&&end<=start)throw new Error(t("終了日時は開始日時より後にしてください。"));
   }
   if (keys.includes('task_sessions')) {
     const raw = next.task_sessions;
@@ -77,22 +78,22 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
       if (!keys.includes('task_start')) next.task_start = null;
       if (!keys.includes('task_end')) next.task_end = null;
     } else {
-      if (!Array.isArray(raw)) throw new Error('作業セッションはリスト形式で入力してください。');
+      if (!Array.isArray(raw)) throw new Error(t("作業セッションはリスト形式で入力してください。"));
       const parsed: WorkSession[] = [];
       for (const entry of raw) {
-        if (typeof entry !== 'string') throw new Error('作業セッションは「開始..終了」の形式で入力してください。');
+        if (typeof entry !== 'string') throw new Error(t("作業セッションは「開始..終了」の形式で入力してください。"));
         const parts = entry.split('..');
-        if (parts.length !== 2) throw new Error('作業セッションは「開始..終了」の形式で入力してください。');
+        if (parts.length !== 2) throw new Error(t("作業セッションは「開始..終了」の形式で入力してください。"));
         const start = dateTime(parts[0].trim());
-        if (start === null) throw new Error('作業セッションの開始日時を確認してください。');
+        if (start === null) throw new Error(t("作業セッションの開始日時を確認してください。"));
         const rawEnd = parts[1].trim();
         if (!rawEnd) { parsed.push({ start, end: null }); continue; }
         const end = dateTime(rawEnd);
-        if (end === null) throw new Error('作業セッションの終了日時を確認してください。');
-        if (end < start) throw new Error('作業終了は作業開始以降の日時にしてください。');
+        if (end === null) throw new Error(t("作業セッションの終了日時を確認してください。"));
+        if (end < start) throw new Error(t("作業終了は作業開始以降の日時にしてください。"));
         parsed.push({ start, end });
       }
-      if (parsed.slice(0, -1).some(s => s.end === null)) throw new Error('途中の作業セッションには終了日時が必要です。');
+      if (parsed.slice(0, -1).some(s => s.end === null)) throw new Error(t("途中の作業セッションには終了日時が必要です。"));
       next.task_sessions = serializeWorkSessions(parsed);
       if (!keys.includes('task_start')) next.task_start = localTimestamp(parsed[0].start);
       if (!keys.includes('task_end')) {
@@ -102,7 +103,7 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
     }
   } else if (keys.some(k => ['task_start','task_end'].includes(k))) {
     const start=dateTime(next.task_start),end=dateTime(next.task_end);
-    if(end!==null&&(start===null||end<start))throw new Error('作業終了は作業開始以降の日時にしてください。');
+    if(end!==null&&(start===null||end<start))throw new Error(t("作業終了は作業開始以降の日時にしてください。"));
     if (start === null && end === null) {
       if (Object.hasOwn(next, 'task_sessions')) next.task_sessions = null;
     } else if (start !== null) {
@@ -111,10 +112,10 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
         if (Object.hasOwn(next, 'task_sessions') || existing.length === 1) syncWorkFields(next, [{ start, end }]);
       } else {
         existing[0].start = start;
-        if (existing[0].end !== null && existing[0].end < start) throw new Error('作業終了は作業開始以降の日時にしてください。');
+        if (existing[0].end !== null && existing[0].end < start) throw new Error(t("作業終了は作業開始以降の日時にしてください。"));
         const last = existing[existing.length - 1];
         last.end = end;
-        if (end !== null && end < last.start) throw new Error('作業終了は作業開始以降の日時にしてください。');
+        if (end !== null && end < last.start) throw new Error(t("作業終了は作業開始以降の日時にしてください。"));
         syncWorkFields(next, existing);
       }
     }

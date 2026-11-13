@@ -1,9 +1,10 @@
+import { t } from './i18n';
 export const STATUS = {
-  todo: { label: '未着手', color: '#94a3b8' },
-  on_going: { label: '進行中', color: '#22d3ee' },
-  done: { label: '完了', color: '#34d399' },
-  on_hold: { label: '保留', color: '#fbbf24' },
-  cancelled: { label: '中止', color: '#fb7185' },
+  todo: { get label() { return t("未着手"); }, color: '#94a3b8' },
+  on_going: { get label() { return t("進行中"); }, color: '#22d3ee' },
+  done: { get label() { return t("完了"); }, color: '#34d399' },
+  on_hold: { get label() { return t("保留"); }, color: '#fbbf24' },
+  cancelled: { get label() { return t("中止"); }, color: '#fb7185' },
 } as const;
 export type Status = keyof typeof STATUS;
 export type Kind = 'task' | 'event' | 'project';
@@ -205,7 +206,7 @@ export function carryovers(items: Item[], day: string): Item[] {
 /** Append inside the real Notes section, without changing frontmatter or other sections. */
 export function appendMemo(content: string, memo: string, stamp: string): string {
   const trimmed = memo.trim();
-  if (!trimmed) throw new Error('メモを入力してください。');
+  if (!trimmed) throw new Error(t("メモを入力してください。"));
   const nl = content.includes('\r\n') ? '\r\n' : '\n';
   const lines = content.split(/\r?\n/);
   let frontmatter = lines[0] === '---', fence = '', start = -1, end = lines.length;
@@ -222,7 +223,7 @@ export function appendMemo(content: string, memo: string, stamp: string): string
     if (start < 0 && /^##\s+Notes\s*#*\s*$/i.test(line)) start = i;
     else if (start >= 0 && /^#{1,2}\s/.test(line)) { end = i; break; }
   }
-  if (frontmatter) throw new Error('フロントマターの終端を確認してください。');
+  if (frontmatter) throw new Error(t("フロントマターの終端を確認してください。"));
   const entry = `- ${stamp} ${trimmed.split(/\r?\n/).join(nl + '  ')}`;
   if (start < 0) return content.replace(/\s*$/, '') + nl + nl + '## Notes' + nl + nl + entry + nl;
   const before = lines.slice(0, end).join(nl).replace(/\s*$/, '');

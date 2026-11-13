@@ -1,3 +1,5 @@
+import * as i18n from '../src/i18n';
+i18n.setLanguage('ja');
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -6,7 +8,7 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
 async function loadPlugin(saved: any = null, existing: any[] = [], storageError?: Error) {
-  const result=await build({loader:{'.md':'text'},entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['obsidian','react','react/*','react-dom/*']});
+  const result=await build({loader:{'.md':'text'},entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
   const registrations:any={notices:[],errors:[]};
   let layoutReady=false;
   class Plugin {
@@ -26,7 +28,7 @@ async function loadPlugin(saved: any = null, existing: any[] = [], storageError?
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
   vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,setTimeout,clearTimeout,
-    require:(id:string)=>id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class{},Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
+    require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class { setName(name:string){(registrations.settingNames??=[]).push(name);return this;} setDesc(){return this;} addText(){return this;} addButton(){return this;} addToggle(){return this;} addDropdown(callback:any){const dropdown={addOptions:()=>dropdown,setValue:()=>dropdown,onChange:(handler:any)=>{registrations.changeLanguage=handler;return dropdown;}};callback(dropdown);return this;} },Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
   const plugin=new module.exports.default();
   plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getMarkdownFiles:()=>[],getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{if(!layoutReady)throw new Error('Vault not ready');if(storageError)throw storageError;storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=()=>{layoutReady=true;return callback();};},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
   await plugin.onload();
@@ -38,7 +40,7 @@ test('plugin loads and registers independent view, command and date-aware Markdo
   assert.equal(registrations.view.type,'daylight');assert.equal(registrations.markdown.type,'daylight');
   assert.equal(registrations.view.factory({}).getDisplayText(),'Daylight');
   assert.equal(registrations.command.id,'open-daylight');
-  assert.equal(registrations.command.name,'Daylightを開く');
+  assert.equal(registrations.command.name,'Open Daylight');
   assert.equal(typeof registrations.markdowns['vault-dashboard'],'function');
   registrations.command.callback();await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(registrations.opened.type,'daylight');
@@ -49,6 +51,21 @@ test('plugin loads and registers independent view, command and date-aware Markdo
   registrations.markdown.callback('date: today',el,ctx);assert.equal(child.date,null);
   registrations.markdown.callback('date: "2026-11-07"',el,ctx);assert.equal(child.date,'2026-11-07');
   registrations.markdown.callback('date: "2026-02-30"',el,ctx);assert.ok(error.includes('YYYY-MM-DD'));
+});
+
+test('language defaults to English, persists, and is restored from settings', async () => {
+  const first = await loadPlugin();
+  assert.equal(first.plugin.settings.language, 'en');
+  assert.equal(first.plugin.store.language, 'en');
+  first.plugin.settings.language = 'ja';
+  await first.plugin.saveSettings();
+  assert.equal(first.registrations.saved.language, 'ja');
+  assert.equal(first.plugin.store.language, 'ja');
+  const restored = await loadPlugin(first.registrations.saved);
+  assert.equal(restored.plugin.settings.language, 'ja');
+  assert.equal(restored.plugin.store.language, 'ja');
+  const invalid = await loadPlugin({ language: 'unsupported' });
+  assert.equal(invalid.plugin.settings.language, 'en');
 });
 
 
@@ -118,7 +135,7 @@ test('storage failure after layout does not prevent plugin registration or start
   await registrations.ready();
   assert.equal(registrations.opened.type,'daylight');
   assert.equal(registrations.errors.length,1);
-  assert.ok(registrations.notices.some((message:string)=>message.includes('フォルダ')));
+  assert.ok(registrations.notices.some((message:string)=>message.includes('folders')));
 });
 
 test('unloading before layout skips storage initialization',async()=>{
@@ -164,4 +181,34 @@ test('startup waits for unresolved dashboard metadata before marking the store r
   await startup;
   assert.equal(plugin.store.isReady(), true);
   assert.equal(removed, true);
+});
+
+test('language setting updates visible settings and rolls back on save failure', async () => {
+  const {plugin,registrations} = await loadPlugin();
+  registrations.settingsTab.containerEl = {empty:()=>{}};
+  registrations.settingsTab.display();
+  assert.ok(registrations.settingNames.includes('Language'));
+  await registrations.changeLanguage('ja');
+  assert.equal(plugin.store.language,'ja');
+  assert.ok(registrations.settingNames.includes('言語'));
+  plugin.saveData = async () => { throw new Error('save failed'); };
+  await registrations.changeLanguage('en');
+  assert.equal(plugin.settings.language,'ja');
+  assert.equal(plugin.store.language,'ja');
+  assert.equal(i18n.getLanguage(),'ja');
+});
+
+test('Chinese and Korean settings persist and update the language selector', async () => {
+  for (const [language, label] of [['zh-CN', '语言'], ['ko', '언어']] as const) {
+    const {plugin, registrations} = await loadPlugin();
+    registrations.settingsTab.containerEl = {empty:()=>{}};
+    registrations.settingsTab.display();
+    await registrations.changeLanguage(language);
+    assert.equal(plugin.settings.language, language);
+    assert.equal(plugin.store.language, language);
+    assert.ok(registrations.settingNames.includes(label));
+    const restored = await loadPlugin(registrations.saved);
+    assert.equal(restored.plugin.settings.language, language);
+    assert.equal(restored.plugin.store.language, language);
+  }
 });
