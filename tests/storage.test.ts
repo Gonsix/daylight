@@ -21,7 +21,10 @@ test('first install creates all folders and complete bundled templates without o
   for(const folder of ['Daylight','Daylight/Tasks','Daylight/Events','Daylight/Projects','Daylight/Templates'])assert.ok(files.get(folder)instanceof TFolder);
   for(const name of ['Task','Event','Project'])assert.ok(files.get(`Daylight/Templates/${name}.md`)instanceof TFile);
   assert.ok((files.get('Daylight/Templates/Task.md')as TFile).content.includes('task_start:'));
-  assert.ok((files.get('Daylight/Templates/Project.md')as TFile).content.includes('## ゴール'));
+  for (const name of ['Task','Event','Project']) {
+    const content=(files.get(`Daylight/Templates/${name}.md`) as TFile).content;
+    assert.equal(content.split('<% "---" %>')[2].trim(), '', name);
+  }
   const template=files.get('Daylight/Templates/Task.md')as TFile;template.content='custom template';await storage.ensure();assert.equal(template.content,'custom template');
 });
 test('installation is idempotent under concurrent creation and rejects file-folder collisions',async()=>{

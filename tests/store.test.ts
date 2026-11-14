@@ -147,7 +147,7 @@ test('new events use the template, canonical project links and minute precision'
   assert.equal(file.path,'Daylight/Events/研究ミーティング 2026-11-06.md');
   const data=fm.get(file.path);assert.equal(data.project,'[[Daylight/Projects/P]]');assert.equal(data.target_date,'2026-11-06');
   assert.equal(data.schedule_start,'2026-11-06T09:03:00');assert.equal(data.schedule_end,'2026-11-06T10:17:00');
-  assert.deepEqual(Array.from(data.tags),['event']);assert.ok(bodies.get(file.path)!.includes('## URL'));assert.ok(bodies.get(file.path)!.includes('準備する'));
+  assert.deepEqual(Array.from(data.tags),['event']);assert.ok(!bodies.get(file.path)!.includes('## URL'));assert.ok(bodies.get(file.path)!.includes('準備する'));
 });
 test('simultaneous same-name creates get separate files and never overwrite an existing event', async () => {
   const {store,bodies}=await fixture();
@@ -168,6 +168,7 @@ test('invalid event ranges, missing templates and unresolved projects produce no
 test('existing event edits update exact minute values and preserve body, unknown fields and original dates', async () => {
   const {store,fm,bodies,renames}=await fixture();
   const file=await store.createEvent(eventInput);
+  bodies.set(file.path, bodies.get(file.path)!+'\n## URL\n\n- https://example.com/meeting\n');
   await store.memo(file.path,'existing memo');
   fm.get(file.path).custom='keep';
   bodies.set(file.path,bodies.get(file.path)!.replace(/^---\n\{[^\n]*\}\n---/,`---\n${JSON.stringify(fm.get(file.path))}\n---`));
@@ -267,7 +268,7 @@ test('existing completed tasks without a timestamp are not assigned a guessed co
 
 const taskInput = {title:'追加タスク',status:'todo',targetDate:'2026-11-08',start:'',end:'',due:'',projectPath:'Daylight/Projects/P.md',parentPath:'',memo:'最初のメモ'};
 const projectInput = {title:'追加プロジェクト',status:'todo',parentPath:'Daylight/Projects/P.md',workingFolder:'/work/research',goal:'成果をまとめる',memo:'検討メモ'};
-test('task creation expands the real template, preserves headings and uses explicit relations and dates', async () => {
+test('task creation uses frontmatter-only defaults and appends only an entered memo', async () => {
   const {store,fm,bodies,task} = await fixture();
   const file = await store.createTask({...taskInput,parentPath:task.path,start:'2026-11-08T10:01',end:'2026-11-08T11:02',due:'2026-11-10T18:00'});
   assert.equal(file.path,'Daylight/Tasks/追加タスク 2026-11-08.md');
@@ -276,7 +277,7 @@ test('task creation expands the real template, preserves headings and uses expli
   assert.equal(props.project,'[[Daylight/Projects/P]]'); assert.equal(props.parent_task,'[[Daylight/Tasks/Task 2026-11-06]]');
   assert.equal(props.schedule_start,'2026-11-08T10:01:00'); assert.equal(props.schedule_end,'2026-11-08T11:02:00');
   assert.equal(props.due,'2026-11-10T18:00:00'); assert.equal(props.target_date,'2026-11-08');
-  assert.ok(body.includes('## Notes')); assert.ok(body.includes('## 派生タスク(Child Tasks)')); assert.ok(body.includes('最初のメモ')); assert.ok(!body.includes('<%'));
+  assert.ok(body.includes('## Notes')); assert.ok(!body.includes('## 派生タスク(Child Tasks)')); assert.ok(body.includes('最初のメモ')); assert.ok(!body.includes('<%'));
 });
 test('unscheduled tasks use TBD, collisions never overwrite, and done tasks get a completion timestamp', async () => {
   const {store,fm,bodies} = await fixture();
@@ -286,14 +287,15 @@ test('unscheduled tasks use TBD, collisions never overwrite, and done tasks get 
   assert.equal(fm.get(files[0].path).target_date,null); assert.equal(fm.get(files[0].path).project,null);
   assert.ok(fm.get(files[0].path)['completed at']); assert.ok(bodies.get(files[0].path));
 });
-test('project creation preserves template sections, parent and goal without inventing task dates', async () => {
+test('project creation appends only entered goal and memo to the frontmatter-only template', async () => {
   const {store,fm,bodies} = await fixture();
   const file = await store.createProject(projectInput);
   assert.equal(file.path,'Daylight/Projects/追加プロジェクト.md');
   const props = fm.get(file.path), body = bodies.get(file.path)!;
   assert.equal(props.parent_project,'[[Daylight/Projects/P]]'); assert.equal(props.working_folder,'/work/research');
   assert.equal(props.status,'todo'); assert.equal(props.target_date,undefined); assert.equal(props.archived,undefined);
-  for (const text of ['## ゴール','成果をまとめる','## 目標','## 完了条件','## TODO','## Event','## Achieved','検討メモ']) assert.ok(body.includes(text),text);
+  for (const text of ['## ゴール','成果をまとめる','検討メモ']) assert.ok(body.includes(text),text);
+  for (const heading of ['## 目標','## 完了条件','## TODO','## Event','## Achieved']) assert.ok(!body.includes(heading),heading);
   const again = await store.createProject(projectInput); assert.equal(again.path,'Daylight/Projects/追加プロジェクト 1.md');
 });
 test('invalid task/project input and stale relation targets never create notes', async () => {
@@ -518,4 +520,16 @@ test('property types use the configured Obsidian directory and reject malformed 
   app.vault.adapter.read = async () => '{invalid JSON';
   const fallback = await store.loadTask(task.path);
   assert.equal(Object.keys(fallback.types).length, 0);
+});
+
+
+test('new tasks, events and projects have empty bodies when no memo or goal is entered', async () => {
+  const { store, bodies } = await fixture();
+  const task = await store.createTask({ ...taskInput, memo: '' });
+  const event = await store.createEvent({ title: 'Blank event', start: '2026-11-08T09:00', end: '2026-11-08T10:00', status: 'todo', projectPath: '', memo: '' });
+  const project = await store.createProject({ ...projectInput, goal: '', memo: '' });
+  for (const file of [task, event, project]) {
+    const content = bodies.get(file.path)!;
+    assert.equal(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '').trim(), '', file.path);
+  }
 });

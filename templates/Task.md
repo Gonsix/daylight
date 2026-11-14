@@ -15,10 +15,3 @@ task_sessions:
 project:
 parent_task:
 <% "---" %>
-
-## Notes
-
--
-
-## 派生タスク(Child Tasks)
-

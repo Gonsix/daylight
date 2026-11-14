@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.5
+
+- Simplify the bundled event, task, and project templates to frontmatter only, with empty bodies.
+- Leave new note bodies empty when no memo or project goal is entered.
+- Add Notes and Goal sections only when their input is provided; preserve custom template content.
+- Skip version 0.4.4. Existing vault templates remain unchanged to preserve user customizations.
+
 ## 0.4.3
 
 - Replace the React DOM renderer with Preact's documented compatibility layer, removing unused runtime script-resource loaders from the distributed bundle.

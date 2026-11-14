@@ -54,8 +54,10 @@ export function renderCreatedNote(template: string, kind: 'task' | 'project', pr
   if (kind === 'task') recordWorkStatus(fm, 'todo');
   let body = expanded.slice(match[0].length);
   if (goal.trim()) {
-    if (!/^## ゴール\s*$/m.test(body)) throw new Error(t("Projectテンプレートのゴール見出しが見つかりません。"));
-    body = body.replace(/^## ゴール[^\S\r\n]*(?:\r?\n|$)/m, heading => `${heading.trimEnd()}\n\n${goal.trim()}\n`);
+    const heading = /^## ゴール[^\S\r\n]*(?:\r?\n|$)/m;
+    body = heading.test(body)
+      ? body.replace(heading, match => `${match.trimEnd()}\n\n${goal.trim()}\n`)
+      : `${body.trimEnd()}\n\n## ゴール\n\n${goal.trim()}\n`;
   }
   let result = `---\n${yaml.stringify(fm).trimEnd()}\n---\n${body}`;
   if (memo.trim()) result = appendMemo(result, memo, day);

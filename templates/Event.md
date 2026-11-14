@@ -9,7 +9,3 @@ schedule_start:
 schedule_end:
 project:
 <% "---" %>
-
-## URL
-
--
