@@ -1,9 +1,8 @@
 import { locale, t, useLanguage } from './i18n';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { dayKey, dayStart, hasSchedule, Item, monthDays, moveDay, moveMonth } from './model';
+import { dayStart, hasSchedule, Item, monthDays, moveDay, moveMonth } from './model';
 
 function Chevron({ right = false }: { right?: boolean }) {
-  const weekdays = Array.from({length:7}, (_, i) => new Intl.DateTimeFormat(locale(), {weekday: "short"}).format(new Date(2026, 0, 5 + i)));
   return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={right ? 'm10 6 6 6-6 6' : 'm14 6-6 6 6 6'} /></svg>;
 }
 

@@ -16,7 +16,7 @@ export function EventForm({ store, seed, close, snapshot }: { store: DaylightSto
   const set = (key: keyof EventInput, value: string) => { setInput(prev => ({ ...prev, [key]: value })); setError(''); };
   const start = dateTime(input.start), end = dateTime(input.end);
   const rangeError = start !== null && end !== null && end <= start ? t("終了日時は開始日時より後にしてください。") : '';
-  return <form className="daylight-app daylight-composer" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current||confirmDelete)} onSubmit={async e => {
+  return <form className="daylight-app daylight-composer" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current||confirmDelete)} onSubmit={e => { void (async () => {
     e.preventDefault(); if (saving.current||confirmDelete) return;
     try { validateEvent(input); } catch (e) { setError((e as Error).message); return; }
     saving.current = true; setBusy(true); setError('');
@@ -25,7 +25,7 @@ export function EventForm({ store, seed, close, snapshot }: { store: DaylightSto
       new Notice(snapshot ? t("予定を更新しました。") : t("予定を追加しました。")); close();
     }
     catch (e) { setError((e as Error).message); saving.current = false; setBusy(false); }
-  }}>
+  })(); }}>
     <fieldset disabled={busy} className="daylight-event-fields">
     <label className="daylight-form-field daylight-title-field"><span>{t("タイトル")}</span><input autoFocus required maxLength={120} value={input.title} onChange={e => set('title',e.target.value)} placeholder={t("予定のタイトル")} /></label>
     <div className="daylight-form-times">
@@ -45,12 +45,12 @@ export function EventForm({ store, seed, close, snapshot }: { store: DaylightSto
     {snapshot?.notes && <div className="daylight-existing-notes">{snapshot.notes}</div>}
     <label className="daylight-form-field"><span>{snapshot ? t("メモを追記") : t("メモ")}</span><textarea rows={3} value={input.memo} onChange={e => set('memo',e.target.value)} /></label>
     {error && <p className="daylight-error" role="alert">{error}</p>}
-    {confirmDelete && <div className="daylight-delete-confirm" role="alert"><p>{t("予定ノートをゴミ箱に移します。")}</p><button type="button" onClick={() => setConfirmDelete(false)}>{t("戻る")}</button><button type="button" className="daylight-delete" onClick={async () => {
+    {confirmDelete && <div className="daylight-delete-confirm" role="alert"><p>{t("予定ノートをゴミ箱に移します。")}</p><button type="button" onClick={() => setConfirmDelete(false)}>{t("戻る")}</button><button type="button" className="daylight-delete" onClick={() => { void (async () => {
       if (!snapshot || saving.current) return;
       saving.current=true;setBusy(true);setError('');
       try { await store.deleteEvent(snapshot);new Notice(t("予定をゴミ箱に移しました。"));close(); }
       catch (e) { setError((e as Error).message);saving.current=false;setBusy(false); }
-    }}>{t("削除する")}</button></div>}
+    })(); }}>{t("削除する")}</button></div>}
     <div className="daylight-form-actions">
       {snapshot && !confirmDelete && <button className="daylight-delete daylight-delete-start" type="button" onClick={() => setConfirmDelete(true)}>{t("削除")}</button>}
       <button type="button" disabled={busy} onClick={close}>{t("キャンセル")}</button><button className="daylight-create" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !!rangeError || confirmDelete}>{busy ? t("処理中…") : snapshot ? t("保存") : t("作成")}</button>

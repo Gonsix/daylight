@@ -14,11 +14,11 @@ export const LANGUAGE_INFO = {
   en: { name: 'English', locale: 'en-US' },
   ja: { name: '日本語', locale: 'ja-JP' },
   'zh-CN': { name: '简体中文', locale: 'zh-CN' },
-  ko: { name: '한국어', locale: 'ko-KR' },
   'zh-TW': { name: '繁體中文', locale: 'zh-TW' },
   es: { name: 'Español', locale: 'es-ES' },
   de: { name: 'Deutsch', locale: 'de-DE' },
   fr: { name: 'Français', locale: 'fr-FR' },
+  ko: { name: '한국어', locale: 'ko-KR' },
   'pt-BR': { name: 'Português (Brasil)', locale: 'pt-BR' },
 } as const;
 export type Language = keyof typeof LANGUAGE_INFO;
@@ -47,7 +47,7 @@ export function subscribeLanguage(listener: () => void): () => void {
 export function useLanguage(): Language {
   return useSyncExternalStore(subscribeLanguage, getLanguage, getLanguage);
 }
-export function t(key: MessageKey, ...values: unknown[]): string {
+export function t(key: MessageKey, ...values: (string | number)[]): string {
   return messages[currentLanguage][key].replace(/\{(\d+)\}/g, (_, index: string) => String(values[Number(index)] ?? ''));
 }
 export const locale = () => LANGUAGE_INFO[currentLanguage].locale;

@@ -27,7 +27,7 @@ export function CreateForm({ store, kind, day = '', projectPath = '', initialSta
   const field = (key: keyof TaskInput | keyof ProjectInput, label: string, type = 'text') =>
     <label className="daylight-form-field"><span>{label}</span><input type={type} step={type === 'datetime-local' ? 60 : undefined}
       value={String((input as unknown as Record<string,string>)[key] ?? '')} onChange={e => set(key,e.target.value)} /></label>;
-  return <form className="daylight-app daylight-composer" onKeyDownCapture={e => submitOnCommandEnter(e,saving.current)} onSubmit={async e => {
+  return <form className="daylight-app daylight-composer" onKeyDownCapture={e => submitOnCommandEnter(e,saving.current)} onSubmit={e => { void (async () => {
     e.preventDefault(); if (saving.current) return;
     try { if (isTask) taskValues(task); else projectValues(project); }
     catch (e) { setError((e as Error).message); return; }
@@ -36,7 +36,7 @@ export function CreateForm({ store, kind, day = '', projectPath = '', initialSta
       if (isTask) await store.createTask(task); else await store.createProject(project);
       new Notice(isTask ? t("タスクを追加しました。") : t("プロジェクトを追加しました。")); close();
     } catch (e) { setError((e as Error).message); saving.current = false; setBusy(false); }
-  }}>
+  })(); }}>
     <fieldset disabled={busy} className="daylight-event-fields">
       <label className="daylight-form-field daylight-title-field"><span>{t("タイトル")}</span><input autoFocus required maxLength={120} value={input.title} onChange={e => set('title',e.target.value)} placeholder={isTask ? t("タスクのタイトル") : t("プロジェクト名")} /></label>
       <div className="daylight-form-times">

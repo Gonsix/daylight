@@ -1,3 +1,4 @@
+import { isRecord, stringList, hasControlCharacters } from './value';
 import { t } from './i18n';
 import { appendMemo, dateTime, dayKey, dayStart, isStatus, Status, timeLabel, validDay } from './model';
 
@@ -38,7 +39,7 @@ export interface EventSnapshot {
 export function validateEvent(input: EventInput): { title: string; start: string; end: string; status: Status } {
   const title = input.title.trim();
   if (!title) throw new Error(t("タイトルを入力してください。"));
-  if (/[\\/:*?"<>|#^\[\]\x00-\x1f]/.test(title) || /\.$/.test(title)) throw new Error(t("タイトルにファイル名で使えない記号が含まれています。"));
+  if (/[\\/:*?"<>|#^[\]]/.test(title) || hasControlCharacters(title) || /\.$/.test(title)) throw new Error(t("タイトルにファイル名で使えない記号が含まれています。"));
   if (title.length > 120) throw new Error(t("タイトルは120文字以内にしてください。"));
   const start = dateTime(input.start), end = dateTime(input.end);
   if (start === null || end === null) throw new Error(t("開始・終了日時を入力してください。"));
@@ -49,14 +50,13 @@ export function validateEvent(input: EventInput): { title: string; start: string
   return { title, start: format(start), end: format(end), status: input.status };
 }
 
-export interface YamlAdapter { parse: (source: string) => any; stringify: (value: any) => string; }
+export interface YamlAdapter { parse: (source: string) => unknown; stringify: (value: unknown) => string; }
 export function eventDocument(content: string, yaml: YamlAdapter) {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) throw new Error(t("予定ノートのフロントマターを確認してください。"));
   const fm = yaml.parse(match[1]);
-  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error(t("予定ノートの属性を確認してください。"));
-  const tags = (Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [])
-    .filter((t: unknown): t is string => typeof t === 'string').map((t: string) => t.replace(/^#/, ''));
+  if (!isRecord(fm)) throw new Error(t("予定ノートの属性を確認してください。"));
+  const tags = stringList(fm.tags).map((t: string) => t.replace(/^#/, ''));
   if (!tags.includes('event') || tags.includes('task') || tags.includes('project')) throw new Error(t("予定ノートではないため編集できません。"));
   return { fm, body: content.slice(match[0].length), newline: content.includes('\r\n') ? '\r\n' : '\n' };
 }
@@ -78,8 +78,8 @@ export function renderEvent(template: string, input: EventInput, projectLink: st
   const match = expanded.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) throw new Error(t("Eventテンプレートのフロントマターを確認してください。"));
   const fm = yaml.parse(match[1]);
-  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error(t("Eventテンプレートの属性を確認してください。"));
-  const tags = Array.isArray(fm.tags) ? fm.tags.filter((tag: unknown): tag is string => typeof tag === 'string') : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [];
+  if (!isRecord(fm)) throw new Error(t("Eventテンプレートの属性を確認してください。"));
+  const tags = stringList(fm.tags);
   fm.tags = Array.from(new Set([...tags.filter((tag: string) => !['task', 'project', '#task', '#project'].includes(tag)), 'event']));
   fm['created at'] = createdDay;
   fm.status = value.status;

@@ -1,22 +1,36 @@
 {
   "name": "daylight",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "license": "MIT",
   "scripts": {
     "build": "node build.mjs",
     "build:install": "bash ./install.sh",
     "check": "tsc --noEmit",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "test": "node --import tsx --test tests/*.test.ts",
+    "lint": "eslint . --max-warnings=0",
+    "validate": "npm run lint && npm run check && npm test && npm run build",
+    "release:prepare": "npm run validate && node scripts/prepare-release.mjs"
   },
-  "dependencies": { "react": "^19.2.0", "react-dom": "^19.2.0" },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "esbuild": "^0.25.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.5.1",
     "obsidian": "latest",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "minimatch@>=7 <11": "^11.0.1"
+  },
+  "engines": {
+    "node": "^22.13.0 || >=24"
   }
 }

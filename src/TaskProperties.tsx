@@ -1,3 +1,4 @@
+import { errorMessage, valueText } from './value';
 import { t, useLanguage } from './i18n';
 import React, { useEffect, useRef, useState } from 'react';
 import { parseYaml, stringifyYaml } from 'obsidian';
@@ -17,7 +18,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
   useEffect(()=>{
     if(dirty.current||saving.current)return;
     let cancelled=false;
-    store.loadTask(item.path).then(data=>{if(!cancelled&&!dirty.current)install(data);}).catch(e=>{if(!cancelled)setError(e.message);});
+    store.loadTask(item.path).then(data=>{if(!cancelled&&!dirty.current)install(data);}).catch(e=>{if(!cancelled)setError(errorMessage(e));});
     return ()=>{cancelled=true;};
   },[item.path,revision]);
   const change=(key:string,value:unknown)=>{dirty.current=true;setChanges(prev=>({...prev,[key]:value}));setError('');};
@@ -28,7 +29,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
   const links=store.items();
   const field=(key:string)=>{
     const current=value(key),kind=type(key),label=PROPERTY_LABELS[key]||key;
-    const text=current===null||current===undefined?'':String(current);
+    const text=valueText(current);
     let control:React.ReactNode;
     if(kind==='status')control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value)}>
       {!isStatus(text)&&<option value={text}>{text||t("未設定")}</option>}{Object.entries(STATUS).map(([id,s])=><option key={id} value={id}>{s.label}</option>)}</select>;
@@ -39,7 +40,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
       control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value||null)}><option value="">{t("未設定")}</option>
         {text&&!options.some(o=>o.value===text)&&<option value={text}>{originalLabel||t("現在の設定")}</option>}
         {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>;
-    } else if(kind==='boolean')control=<select value={current===null?'':String(current)} aria-label={label} onChange={e=>change(key,e.target.value===''?null:e.target.value==='true')}><option value="">{t("未設定")}</option><option value="true">{t("はい")}</option><option value="false">{t("いいえ")}</option></select>;
+    } else if(kind==='boolean')control=<select value={valueText(current)} aria-label={label} onChange={e=>change(key,e.target.value===''?null:e.target.value==='true')}><option value="">{t("未設定")}</option><option value="true">{t("はい")}</option><option value="false">{t("いいえ")}</option></select>;
     else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder={t("1行に1項目")} value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.target.value)} />;
     else if(kind==='yaml')control=<textarea className="daylight-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.target.value)} />;
     else if(kind==='datetime') {
@@ -50,7 +51,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     else control=<input type="text" aria-label={label} value={text} onChange={e=>change(key,e.target.value)} />;
     return <label className="daylight-form-field daylight-property-field" key={key}><span>{label}{kind==='yaml'&&<small>YAML</small>}</span>{control}</label>;
   };
-  return <form className="daylight-task-properties" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current)} onSubmit={async e=>{
+  return <form className="daylight-task-properties" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current)} onSubmit={e=>{ void (async () => {
     e.preventDefault();if(saving.current)return;
     const patch:PropertyChanges={...changes};
     try {
@@ -68,7 +69,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
       if(mounted.current)install(refreshed);onSaved(file.path);
     } catch(e){if(mounted.current)setError(saved?t("保存済みです。詳細を開き直してください。"):(e as Error).message.replaceAll(t("再読み込みしてください。"),t("詳細を開き直してください。")));}
     finally {saving.current=false;if(mounted.current)setBusy(false);}
-  }}>
+  })(); }}>
     <div className="daylight-property-header"><h3>{t("プロパティ")}</h3></div>
     <fieldset disabled={busy} className="daylight-event-fields">
       {TASK_FIELDS.map(field)}

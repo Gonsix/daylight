@@ -1,3 +1,4 @@
+import { errorMessage } from './value';
 import { DEFAULT_LANGUAGE, Language, t, translate, useLanguage } from './i18n';
 import React, { CSSProperties, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Notice } from 'obsidian';
@@ -31,11 +32,11 @@ function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
   useLanguage();
   const [busy, setBusy] = useState(false);
   return <select className="daylight-status" style={stateColor(item)} aria-label={t("{0}の状態", item.title)} value={item.status} disabled={busy}
-    onClick={e => e.stopPropagation()} onChange={async e => {
+    onClick={e => e.stopPropagation()} onChange={e => { void (async () => {
       const next = e.target.value; setBusy(true);
       try { await store.setStatus(item, next); } catch (e) { new Notice((e as Error).message); }
       finally { setBusy(false); }
-    }}>
+    })(); }}>
     {!isStatus(item.status) && <option value={item.status}>{item.status || t("未設定")}</option>}
     {Object.entries(STATUS).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
   </select>;
@@ -113,12 +114,12 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
   useEffect(() => { heading.current?.focus(); }, [item.path]);
   useEffect(() => {
     let alive = true;
-    store.notes(item.path).then(text => { if (alive) setNotes(text); }).catch(e => { if (alive) setError(e.message); });
+    store.notes(item.path).then(text => { if (alive) setNotes(text); }).catch(e => { if (alive) setError(errorMessage(e)); });
     return () => { alive = false; };
   }, [item.path, revision]);
   return <aside className="daylight-detail" role="dialog" aria-label={item.title}>
     <div className="daylight-detail-actions"><span>{item.kind === 'task' ? t("タスク") : item.kind === 'event' ? t("予定") : t("プロジェクト")}</span>
-      <button className="daylight-icon-button" aria-label={t("ノートを開く")} onClick={() => void store.open(item.path).catch(e => new Notice(e.message))}><Icon name="open" /></button>
+      <button className="daylight-icon-button" aria-label={t("ノートを開く")} onClick={() => void store.open(item.path).catch(e => new Notice(errorMessage(e)))}><Icon name="open" /></button>
       <button className="daylight-icon-button" aria-label={t("詳細を閉じる")} onClick={onClose}><Icon name="close" /></button>
     </div>
     <h2 tabIndex={-1} ref={heading}>{item.title}</h2>
@@ -142,12 +143,12 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
     {workDuration(item) && <p className="daylight-work-duration">{t("作業時間")}{' '}{workDuration(item)}</p>}
     <h3>{t("メモ")}</h3>
     {notes && <div className="daylight-notes">{notes}</div>}
-    <form onKeyDownCapture={e=>submitOnCommandEnter(e,memoSaving.current)} onSubmit={async e => {
+    <form onKeyDownCapture={e=>submitOnCommandEnter(e,memoSaving.current)} onSubmit={e => { void (async () => {
       e.preventDefault(); if (memoSaving.current || !draft.trim()) return;
       const text = draft; memoSaving.current=true;setBusy(true); setError('');
       try { await store.memo(item.path, text); onSaved(text); setNotes(await store.notes(item.path)); }
       catch (e) { setError((e as Error).message); } finally { memoSaving.current=false;setBusy(false); }
-    }}>
+    })(); }}>
       <textarea value={draft} onChange={e => onDraft(e.target.value)} aria-label={t("メモを追記")} placeholder={t("メモを追記…")} rows={4} />
       {error && <p className="daylight-error" role="alert">{error}</p>}
       <div className="daylight-detail-save-actions">{item.kind === 'project' && <button type="button" className="daylight-detail-delete" disabled={busy} onClick={() => openDeleteNoteModal(store,item,onClose)}>{t("削除")}</button>}<button className="daylight-save" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !draft.trim()}>{busy ? t("保存中…") : t("追加")}</button></div>
@@ -209,7 +210,7 @@ function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore
   const root = useRef<HTMLDivElement>(null), focusReturn = useRef<HTMLElement | null>(null);
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(id); }, []);
   const select = (path: string, event?: React.MouseEvent) => {
-    if (event && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void store.open(path, true).catch(e => new Notice(e.message)); return; }
+    if (event && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void store.open(path, true).catch(e => new Notice(errorMessage(e))); return; }
     if (store.items().find(i => i.path === path)?.kind === 'event') { openEditEventModal(store,path); return; }
     focusReturn.current = root.current?.ownerDocument.activeElement as HTMLElement; setSelected(path);
   };

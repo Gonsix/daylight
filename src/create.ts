@@ -1,3 +1,4 @@
+import { isRecord, stringList, hasControlCharacters } from './value';
 import { t } from './i18n';
 import { appendMemo, dateTime, dayKey, isStatus, timeLabel, validDay } from './model';
 import { recordWorkStatus } from './execution';
@@ -13,7 +14,7 @@ export interface ProjectInput {
 export function validateTitle(raw: string): string {
   const title = raw.trim();
   if (!title) throw new Error(t("タイトルを入力してください。"));
-  if (/[\\/:*?"<>|#^\[\]\x00-\x1f]/.test(title) || /\.$/.test(title)) throw new Error(t("タイトルにファイル名で使えない記号が含まれています。"));
+  if (/[\\/:*?"<>|#^[\]]/.test(title) || hasControlCharacters(title) || /\.$/.test(title)) throw new Error(t("タイトルにファイル名で使えない記号が含まれています。"));
   if (title.length > 120) throw new Error(t("タイトルは120文字以内にしてください。"));
   return title;
 }
@@ -46,9 +47,8 @@ export function renderCreatedNote(template: string, kind: 'task' | 'project', pr
   const match = expanded.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) throw new Error(t("{0}テンプレートのフロントマターを確認してください。", label));
   const fm = yaml.parse(match[1]);
-  if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw new Error(t("{0}テンプレートの属性を確認してください。", label));
-  const tags = (Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [])
-    .filter((t: unknown): t is string => typeof t === 'string');
+  if (!isRecord(fm)) throw new Error(t("{0}テンプレートの属性を確認してください。", label));
+  const tags = stringList(fm.tags);
   fm.tags = [...new Set([...tags.filter((t: string) => !['task','project','event'].includes(t.replace(/^#/,''))), kind])];
   Object.assign(fm, properties, { 'created at': day });
   if (kind === 'task') recordWorkStatus(fm, 'todo');

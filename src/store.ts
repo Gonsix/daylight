@@ -1,3 +1,4 @@
+import { isRecord, stringList, valueText } from './value';
 import { t } from './i18n';
 import { App, Plugin, TAbstractFile, TFile, TFolder, parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStorage } from './storage';
@@ -8,6 +9,8 @@ import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from
 import { isFrontmatterRunning, isTaskRunning, pauseWork, recordWorkStatus } from './execution';
 import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
 import { DEFAULT_LANGUAGE, Language } from './i18n';
+
+const timerHost = window;
 
 export interface DeleteSnapshot { path: string; kind: 'task' | 'project'; content: string }
 
@@ -23,13 +26,13 @@ export class DaylightStore {
   private orderOverrides = new Map<string, { value: number; previous: unknown }>();
   private workOverrides = new Map<string, { sessions: WorkSession[]; taskStart: number | null; taskEnd: number | null; valueKey: string; previousKey: string }>();
   private ready = false;
-  private notifyTimer: ReturnType<typeof setTimeout> | null = null;
+  private notifyTimer: number | null = null;
   sortOrderGap = 10000;
   language: Language = DEFAULT_LANGUAGE;
   constructor(public app: App, plugin: Plugin, root = 'Daylight') {
     this.storage = new DaylightStorage(app,root);
     const notify = () => {
-      if (this.notifyTimer !== null) { clearTimeout(this.notifyTimer); this.notifyTimer = null; }
+      if (this.notifyTimer !== null) { timerHost.clearTimeout(this.notifyTimer); this.notifyTimer = null; }
       this.revision++;
       for (const fn of this.listeners) fn();
     };
@@ -42,7 +45,7 @@ export class DaylightStore {
       this.cache = null;
       if (!this.ready || this.notifyTimer !== null) return;
       if (typeof setTimeout !== 'function') { notify(); return; }
-      this.notifyTimer = setTimeout(notify, 16);
+      this.notifyTimer = timerHost.setTimeout(notify, 16);
     };
     const relevant = (path: string) => this.storage.kind(path) !== null;
     const onFileChange = (file: TAbstractFile, oldPath?: string) => {
@@ -83,7 +86,7 @@ export class DaylightStore {
     plugin.registerEvent(app.vault.on('rename', (file, oldPath) => onFileChange(file, oldPath)));
     plugin.registerEvent(app.vault.on('modify', file => onFileChange(file)));
     plugin.register(() => {
-      if (this.notifyTimer !== null) { clearTimeout(this.notifyTimer); this.notifyTimer = null; }
+      if (this.notifyTimer !== null) { timerHost.clearTimeout(this.notifyTimer); this.notifyTimer = null; }
       this.listeners.clear();
     });
     this.invalidate = update;
@@ -102,12 +105,12 @@ export class DaylightStore {
       const finish = () => {
         if (done) return;
         done = true;
-        clearTimeout(timer);
+        timerHost.clearTimeout(timer);
         this.app.metadataCache.offref(event);
         resolve();
       };
       const event = this.app.metadataCache.on('resolved', finish);
-      const timer = setTimeout(finish, 3000);
+      const timer = timerHost.setTimeout(finish, 3000);
     });
   }
   markReady() {
@@ -129,10 +132,10 @@ export class DaylightStore {
     return this.cache;
   }
   private parseItem(file: TFile): Item | null {
-      const cached = this.app.metadataCache.getFileCache(file), fm = cached?.frontmatter;
+      const cached = this.app.metadataCache.getFileCache(file), fm: Record<string, unknown> | undefined = cached?.frontmatter;
       if (!fm) return null;
-      const tags: string[] = Array.isArray(fm.tags) ? fm.tags : typeof fm.tags === 'string' ? fm.tags.split(/[,\s]+/) : [];
-      const allTags = [...tags, ...(cached.tags?.map(t => t.tag) ?? [])].filter(t => typeof t === 'string').map(t => t.replace(/^#/, ''));
+      const tags = stringList(fm.tags);
+      const allTags = [...tags, ...(cached?.tags?.map(t => t.tag) ?? [])].filter(t => typeof t === 'string').map(t => t.replace(/^#/, ''));
       const kinds = (['task', 'event', 'project'] as Kind[]).filter(k => allTags.includes(k));
       if (kinds.length !== 1) return null;
       const kind = kinds[0];
@@ -144,7 +147,7 @@ export class DaylightStore {
       if (override && (raw === override.status || raw !== override.previous)) this.overrides.delete(file.path);
       const orderOverride = this.orderOverrides.get(file.path);
       if (orderOverride && (fm.sort_order === orderOverride.value || fm.sort_order !== orderOverride.previous)) this.orderOverrides.delete(file.path);
-      const sortOrder = this.orderOverrides.get(file.path)?.value ?? (Number.isSafeInteger(fm.sort_order) ? fm.sort_order : null);
+      const sortOrder = this.orderOverrides.get(file.path)?.value ?? (typeof fm.sort_order === 'number' && Number.isSafeInteger(fm.sort_order) ? fm.sort_order : null);
       const project = typeof fm.project === 'string' ? fm.project : '';
       const target = project.match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]$/);
       const linked = target ? this.app.metadataCache.getFirstLinkpathDest(target[1], file.path) : null;
@@ -207,8 +210,8 @@ export class DaylightStore {
     let last = rows.reduce((max, i) => i.sortOrder != null ? Math.max(max, i.sortOrder) : max, 0);
     for (const item of rows.filter(i => i.sortOrder == null)) {
       const value = orderBetween(last, null, this.sortOrderGap);
-      await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
-        if (String(fm.status ?? '').trim() !== status || (fm.sort_order != null && fm.sort_order !== '')) throw new Error(t("タスクが更新されています。もう一度お試しください。"));
+      await this.app.fileManager.processFrontMatter(this.file(item.path), (fm: Record<string, unknown>) => {
+        if (valueText(fm.status).trim() !== status || (fm.sort_order != null && fm.sort_order !== '')) throw new Error(t("タスクが更新されています。もう一度お試しください。"));
         const previous = fm.sort_order; fm.sort_order = value;
         this.orderOverrides.set(item.path, {value, previous});
       });
@@ -230,8 +233,8 @@ export class DaylightStore {
       const value = orderBetween(rows[position-1]?.sortOrder ?? null, rows[position]?.sortOrder ?? null, this.sortOrderGap);
       const current = this.items().find(i => i.path === item.path);
       if (!current || current.status !== item.status) throw new Error(t("タスクの状態が更新されています。"));
-      await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
-        if (String(fm.status ?? '').trim() !== item.status || fm.sort_order !== current.sortOrder) throw new Error(t("タスクが更新されています。もう一度お試しください。"));
+      await this.app.fileManager.processFrontMatter(this.file(item.path), (fm: Record<string, unknown>) => {
+        if (valueText(fm.status).trim() !== item.status || fm.sort_order !== current.sortOrder) throw new Error(t("タスクが更新されています。もう一度お試しください。"));
         const previous = fm.sort_order; fm.sort_order = value; this.orderOverrides.set(item.path,{value,previous});
       });
       this.invalidate(item.path);
@@ -253,8 +256,8 @@ export class DaylightStore {
       const order = item.kind === 'task' && item.status !== status ? await this.appendOrder(status, item.path) : null;
       const previousKey = this.workKey(itemSessions(item), item.taskStart ?? null, item.taskEnd ?? null);
       let updatedWork: Record<string, unknown> | null = null;
-      await this.app.fileManager.processFrontMatter(this.file(item.path), fm => {
-        if (String(fm.status ?? '').trim() !== item.status) throw new Error(t("状態が更新されています。再度選択してください。"));
+      await this.app.fileManager.processFrontMatter(this.file(item.path), (fm: Record<string, unknown>) => {
+        if (valueText(fm.status).trim() !== item.status) throw new Error(t("状態が更新されています。再度選択してください。"));
         const previous=fm.status;
         fm.status = status;
         if (order !== null) { this.orderOverrides.set(item.path,{value:order,previous:fm.sort_order}); fm.sort_order=order; }
@@ -334,9 +337,8 @@ export class DaylightStore {
   async notes(path: string) { return notesText(await this.app.vault.read(this.file(path))); }
   private deletionKind(content: string): 'task' | 'project' {
     const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-    const fm = match ? parseYaml(match[1]) : null;
-    const tags = (Array.isArray(fm?.tags) ? fm.tags : typeof fm?.tags === 'string' ? fm.tags.split(/[,\s]+/) : [])
-      .filter((t: unknown): t is string => typeof t === 'string').map((t: string) => t.replace(/^#/, ''));
+    const parsed: unknown = match ? parseYaml(match[1]) : null;
+    const tags = stringList(isRecord(parsed) ? parsed.tags : null).map(tag => tag.replace(/^#/, ''));
     const kinds = (['task', 'project', 'event'] as const).filter(k => tags.includes(k));
     if (kinds.length !== 1 || kinds[0] === 'event') throw new Error(t("タスクまたはプロジェクトのノートを選び直してください。"));
     return kinds[0];
@@ -373,7 +375,10 @@ export class DaylightStore {
   async loadTask(path:string):Promise<TaskSnapshot> {
     const file=this.file(path),{fm}=taskDocument(await this.app.vault.read(file),{parse:parseYaml,stringify:stringifyYaml});
     let types:Record<string,string>={};
-    try { types=JSON.parse(await this.app.vault.adapter.read('.obsidian/types.json')).types??{}; } catch { /* Unknown types remain editable as text/YAML. */ }
+    try {
+      const parsed: unknown = JSON.parse(await this.app.vault.adapter.read(`${this.app.vault.configDir}/types.json`));
+      if (isRecord(parsed) && isRecord(parsed.types)) types = Object.fromEntries(Object.entries(parsed.types).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    } catch { /* Unknown types remain editable as text/YAML. */ }
     return {path,properties:fm,types};
   }
   private taskReference(value:unknown,kind:'project'|'task',source:string):string|null {
@@ -451,7 +456,7 @@ export class DaylightStore {
   async loadEvent(path: string): Promise<EventSnapshot> {
     const file = this.file(path), content = await this.app.vault.read(file);
     const { fm } = eventDocument(content, { parse: parseYaml, stringify: stringifyYaml });
-    const rawProject = typeof fm.project === 'string' ? fm.project : fm.project ? String(fm.project) : '';
+    const rawProject = valueText(fm.project);
     const link = rawProject.match(/^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]$/);
     const resolved = link ? this.app.metadataCache.getFirstLinkpathDest(link[1], path) : null;
     const linkedProject = resolved && this.items().some(i => i.kind === 'project' && i.path === resolved.path) ? resolved : null;

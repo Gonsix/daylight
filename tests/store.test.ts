@@ -25,7 +25,7 @@ const compiled = build({loader:{'.md':'text'}, entryPoints: [path.resolve('src/s
 async function fixture() {
   const module = { exports: {} as any };
   const require = createRequire(path.join(process.cwd(), 'package.json'));
-  vm.runInNewContext((await compiled).outputFiles[0].text, { module, exports: module.exports,
+  vm.runInNewContext((await compiled).outputFiles[0].text, { module, exports: module.exports, window: {setTimeout,clearTimeout},
     require: (id: string) => id === './i18n' ? i18n : id === 'obsidian' ? { TFile: File, TFolder: Folder,
       parseYaml: (source:string) => source.trim().startsWith('{') ? JSON.parse(source) : ({ tags:['event'],status:'todo','created at':'','last updated':null }),
       stringifyYaml: JSON.stringify,
@@ -45,7 +45,7 @@ async function fixture() {
   const app = {
     metadataCache: { on: (name: string, callback: (...args: any[]) => void) => { events.set('metadata:' + name, callback); return {}; }, getFileCache: (f: File) => ({ frontmatter: fm.get(f.path) }),
       getFirstLinkpathDest: (link: string) => files.find(f=>f.path.replace(/\.md$/,'')===link||f.basename===link)??null },
-    vault: { on: (name: string, callback: (...args: any[]) => void) => { events.set('vault:' + name, callback); return {}; }, getMarkdownFiles: () => files,
+    vault: { configDir: '.obsidian', adapter: { read: async (_path: string) => '{}' }, on: (name: string, callback: (...args: any[]) => void) => { events.set('vault:' + name, callback); return {}; }, getMarkdownFiles: () => files,
       getAbstractFileByPath: (p: string): File | Folder | null | undefined => templates.find(f => f.path === p) ?? files.find(f => f.path === p) ?? (files.some(f => f.path.startsWith(p + '/')) ? new Folder(p, files) : null),
       read: async (f: File) => templates.includes(f) ? readFileSync('templates/'+f.path.split('/').at(-1),'utf8') : bodies.get(f.path) ?? '',
       create: async (p:string,content:string) => {
@@ -499,4 +499,23 @@ test('status changes place tasks at the end of the destination column', async ()
   files.push(other);fm.set(other.path,{tags:['task'],status:'on_hold',sort_order:12345});store.sortOrderGap=1000;store.invalidate();
   await store.setStatus(store.items().find((i:any)=>i.path===task.path),'on_hold');
   assert.equal(fm.get(task.path).sort_order,13345);
+});
+
+
+test('property types use the configured Obsidian directory and reject malformed declarations', async () => {
+  const { store, app, task } = await fixture();
+  app.vault.configDir = 'Custom config';
+  const paths: string[] = [];
+  app.vault.adapter.read = async (path: string) => {
+    paths.push(path);
+    return JSON.stringify({ types: { custom: 'number', broken: 42, nested: {} } });
+  };
+  const snapshot = await store.loadTask(task.path);
+  assert.deepEqual(paths, ['Custom config/types.json']);
+  assert.equal(snapshot.types.custom, 'number');
+  assert.equal(snapshot.types.broken, undefined);
+  assert.equal(snapshot.types.nested, undefined);
+  app.vault.adapter.read = async () => '{invalid JSON';
+  const fallback = await store.loadTask(task.path);
+  assert.equal(Object.keys(fallback.types).length, 0);
 });

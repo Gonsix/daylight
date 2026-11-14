@@ -181,6 +181,7 @@
   "Daylight: 設定の保存に失敗しました。": "Daylight: no se han podido guardar los ajustes.",
   "設定を保存できませんでした。もう一度お試しください。": "No se han podido guardar los ajustes. Inténtalo de nuevo.",
   "表示できませんでした。ビューを開き直してください。": "No se ha podido mostrar el panel. Vuelve a abrir la vista.",
+  "ダッシュボードを開く": "Abrir panel",
   "Daylightを開く": "Abrir Daylight",
   "Daylight: フォルダの初期化に失敗しました。": "Daylight: no se han podido inicializar las carpetas.",
   "Daylightフォルダを準備できませんでした。設定の配置場所と書き込み権限を確認してください。": "No se han podido preparar las carpetas de Daylight. Revisa la ubicación y los permisos de escritura.",

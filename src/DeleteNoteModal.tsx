@@ -17,12 +17,12 @@ export function DeleteNoteForm({ store, item, snapshot, close, onDeleted }: {
     {error && <p className="daylight-error" role="alert">{error}</p>}
     <div className="daylight-form-actions">
       <button type="button" disabled={busy} onClick={close}>{t("キャンセル")}</button>
-      <button type="button" className="daylight-delete" disabled={busy} onClick={async () => {
+      <button type="button" className="daylight-delete" disabled={busy} onClick={() => { void (async () => {
         if (saving.current) return;
         saving.current=true;setBusy(true);setError('');
         try { await store.deleteNote(snapshot); new Notice(t("ノートをゴミ箱に移しました。")); close(); onDeleted(); }
         catch (e) { setError((e as Error).message); saving.current=false;setBusy(false); }
-      }}>{busy ? t("削除中…") : t("削除する")}</button>
+      })(); }}>{busy ? t("削除中…") : t("削除する")}</button>
     </div>
   </div>;
 }

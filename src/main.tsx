@@ -1,12 +1,15 @@
-import { DEFAULT_LANGUAGE, LANGUAGE_INFO, LANGUAGES, Language, parseLanguage, setLanguage, subscribeLanguage, t, translate, useLanguage } from './i18n';
+import { isRecord, valueText } from './value';
+import { DEFAULT_LANGUAGE, LANGUAGE_INFO, LANGUAGES, Language, parseLanguage, setLanguage, subscribeLanguage, t, translate } from './i18n';
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import { ItemView, MarkdownRenderChild, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, addIcon, parseYaml } from 'obsidian';
+import { ItemView, MarkdownRenderChild, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, addIcon, parseYaml, requireApiVersion } from 'obsidian';
 import { Daylight } from './Daylight';
 import { DaylightStore } from './store';
 import { validDay } from './model';
 import { DAYLIGHT_ICON, DAYLIGHT_ICON_SVG } from './icon';
 import { DEFAULT_ROOT, storageRoot } from './storage';
+
+const timerHost = window;
 
 const VIEW_TYPE = 'daylight';
 interface DaylightSettings { openOnStartup: boolean; rootFolder: string; sortOrderGap: number; language: Language }
@@ -14,10 +17,28 @@ const DEFAULT_SETTINGS: DaylightSettings = { openOnStartup: false, rootFolder: D
 
 class DaylightSettingTab extends PluginSettingTab {
   constructor(private dashboard: DaylightPlugin) { super(dashboard.app, dashboard); }
+  getSettingDefinitions() {
+    return [
+      { name: translate(this.dashboard.settings.language, 'language'), desc: '', render: (setting: Setting) => this.renderLanguage(setting) },
+      { name: t("Daylightフォルダの配置場所"), desc: t("Vault内の配置場所です。保存するとタスク・予定・プロジェクト・テンプレートをまとめて移動します。例: Daylight / etc/Daylight"), render: (setting: Setting) => this.renderRoot(setting) },
+      { name: t("ソートオーダーの間隔"), desc: t("新規タスクや状態を変更したタスクを末尾に追加するときの間隔です。1以上の整数を指定してください。既存の順序は変更しません。"), render: (setting: Setting) => this.renderGap(setting) },
+      { name: t("起動時にDaylightを開く"), desc: t("Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。"), render: (setting: Setting) => this.renderStartup(setting) },
+    ];
+  }
+  // Obsidian versions before 1.13 still need the imperative renderer.
   display() {
     this.containerEl.empty();
+    for (const definition of this.getSettingDefinitions()) {
+      definition.render(new Setting(this.containerEl).setName(definition.name).setDesc(definition.desc));
+    }
+  }
+  private refresh() {
+    if (requireApiVersion('1.13.0')) this.update();
+    else this.display();
+  }
+  private renderLanguage(setting: Setting) {
     const language = this.dashboard.settings.language;
-    new Setting(this.containerEl).setName(translate(language, 'language'))
+    setting
       .addDropdown(dropdown => {
         // Build this plugin's list explicitly, even if the host supplied options.
         dropdown.selectEl.replaceChildren();
@@ -28,23 +49,25 @@ class DaylightSettingTab extends PluginSettingTab {
           if (!LANGUAGES.includes(value as Language)) return;
           const previous = this.dashboard.settings.language;
           this.dashboard.settings.language = parseLanguage(value);
-          try { await this.dashboard.saveSettings(); this.display(); }
+          try { await this.dashboard.saveSettings(); this.refresh(); }
           catch { this.dashboard.settings.language = previous; dropdown.setValue(previous); new Notice(t("設定を保存できませんでした。")); }
         });
       });
+  }
+  private renderRoot(setting: Setting) {
     let root = this.dashboard.settings.rootFolder;
-    new Setting(this.containerEl).setName(t("Daylightフォルダの配置場所"))
-      .setDesc(t("Vault内の配置場所です。保存するとタスク・予定・プロジェクト・テンプレートをまとめて移動します。例: Daylight / etc/Daylight"))
+    setting
       .addText(text => text.setPlaceholder('Daylight').setValue(root).onChange(value => {root=value;}))
       .addButton(button => button.setButtonText(t("保存して移動")).onClick(async () => {
         button.setDisabled(true);
-        try {await this.dashboard.changeRootFolder(root);new Notice(t("Daylightフォルダの配置場所を保存しました。"));this.display();}
+        try {await this.dashboard.changeRootFolder(root);new Notice(t("Daylightフォルダの配置場所を保存しました。"));this.refresh();}
         catch(error) {new Notice((error as Error).message);}
         finally {button.setDisabled(false);}
       }));
+  }
+  private renderGap(setting: Setting) {
     let gap = String(this.dashboard.settings.sortOrderGap);
-    new Setting(this.containerEl).setName(t("ソートオーダーの間隔"))
-      .setDesc(t("新規タスクや状態を変更したタスクを末尾に追加するときの間隔です。1以上の整数を指定してください。既存の順序は変更しません。"))
+    setting
       .addText(text => text.setValue(gap).onChange(value => { gap = value; }))
       .addButton(button => button.setButtonText(t("保存")).onClick(async () => {
         const value = Number(gap);
@@ -54,21 +77,19 @@ class DaylightSettingTab extends PluginSettingTab {
         try { await this.dashboard.saveSettings(); new Notice(t("ソートオーダーの間隔を保存しました。")); }
         catch { this.dashboard.settings.sortOrderGap = previous; new Notice(t("設定を保存できませんでした。")); }
       }));
-    for (const [key, name, desc] of [
-      ['openOnStartup', t("起動時にDaylightを開く"), t("Obsidianの起動後、専用タブをホーム画面として表示します。開いているノートは保持します。HearthやHomepageの起動時表示はオフにしてください。")],
-    ] as const) {
-      new Setting(this.containerEl).setName(name).setDesc(desc)
-        .addToggle(toggle => toggle.setValue(this.dashboard.settings[key]).onChange(async value => {
-          const previous = this.dashboard.settings[key];
-          this.dashboard.settings[key] = value;
+  }
+  private renderStartup(setting: Setting) {
+    setting
+        .addToggle(toggle => toggle.setValue(this.dashboard.settings.openOnStartup).onChange(async value => {
+          const previous = this.dashboard.settings.openOnStartup;
+          this.dashboard.settings.openOnStartup = value;
           try { await this.dashboard.saveSettings(); }
           catch (error) {
-            this.dashboard.settings[key] = previous; toggle.setValue(previous);
+            this.dashboard.settings.openOnStartup = previous; toggle.setValue(previous);
             console.error(t("Daylight: 設定の保存に失敗しました。"), error);
             new Notice(t("設定を保存できませんでした。もう一度お試しください。"));
           }
         }));
-    }
   }
 }
 class Boundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {
@@ -107,8 +128,9 @@ export default class DaylightPlugin extends Plugin {
   settings: DaylightSettings = { ...DEFAULT_SETTINGS };
   async onload() {
     addIcon(DAYLIGHT_ICON, DAYLIGHT_ICON_SVG);
-    const saved = await this.loadData();
-    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT, sortOrderGap: Number.isSafeInteger(saved?.sortOrderGap) && saved.sortOrderGap > 0 ? saved.sortOrderGap : 10000, language: parseLanguage(saved?.language) };
+    const rawSaved: unknown = await this.loadData();
+    const saved = isRecord(rawSaved) ? rawSaved : {};
+    this.settings = { openOnStartup: typeof saved?.openOnStartup === 'boolean' ? saved.openOnStartup : DEFAULT_SETTINGS.openOnStartup, rootFolder: typeof saved?.rootFolder === 'string' ? storageRoot(saved.rootFolder) : DEFAULT_ROOT, sortOrderGap: typeof saved.sortOrderGap === 'number' && Number.isSafeInteger(saved.sortOrderGap) && saved.sortOrderGap > 0 ? saved.sortOrderGap : 10000, language: parseLanguage(saved?.language) };
     if (saved && Object.hasOwn(saved,'enableKanban')) await this.saveData(this.settings);
     setLanguage(this.settings.language);
     this.addSettingTab(new DaylightSettingTab(this));
@@ -124,20 +146,20 @@ export default class DaylightPlugin extends Plugin {
       await this.app.workspace.revealLeaf(leaf);
     };
     this.addRibbonIcon(DAYLIGHT_ICON, 'Daylight', () => void open());
-    this.openCommand = { id: 'open-daylight', name: t("Daylightを開く"), callback: () => void open() };
+    this.openCommand = { id: 'open-daylight', name: t("ダッシュボードを開く"), callback: () => void open() };
     this.addCommand(this.openCommand);
     let active = true;
     let readyFrame = 0;
     this.register(() => {
       active = false;
-      if (readyFrame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(readyFrame);
+      if (readyFrame && typeof cancelAnimationFrame === 'function') timerHost.cancelAnimationFrame(readyFrame);
     });
     const finishStartup = () => {
       if (!active) return;
       if (typeof requestAnimationFrame !== 'function') { this.store.markReady(); return; }
-      readyFrame = requestAnimationFrame(() => {
+      readyFrame = timerHost.requestAnimationFrame(() => {
         if (!active) return;
-        readyFrame = requestAnimationFrame(() => {
+        readyFrame = timerHost.requestAnimationFrame(() => {
           readyFrame = 0;
           if (active) this.store.markReady();
         });
@@ -164,13 +186,14 @@ export default class DaylightPlugin extends Plugin {
     });
     for (const language of ['vault-dashboard', 'daylight']) this.registerMarkdownCodeBlockProcessor(language, (source, el, ctx) => {
       try {
-        const config = source.trim() ? parseYaml(source) : {};
+        const parsed: unknown = source.trim() ? parseYaml(source) : {};
+        const config = isRecord(parsed) ? parsed : {};
         const requested = config?.date;
         let date: string | null = null;
         if (requested === 'today') date = null;
         else if (requested !== undefined) {
           // The parser may return a Date for unquoted YAML dates.
-          const raw = requested instanceof Date ? requested.toISOString().slice(0, 10) : String(requested);
+          const raw = requested instanceof Date ? requested.toISOString().slice(0, 10) : valueText(requested);
           if (!validDay(raw)) throw new Error(t("日付は YYYY-MM-DD で指定してください。"));
           date = raw;
         } else {
@@ -186,7 +209,7 @@ export default class DaylightPlugin extends Plugin {
     this.store.sortOrderGap = this.settings.sortOrderGap;
     this.store.language = this.settings.language;
     setLanguage(this.settings.language);
-    if (this.openCommand) this.openCommand.name = t("Daylightを開く");
+    if (this.openCommand) this.openCommand.name = t("ダッシュボードを開く");
     this.store.invalidate();
   }
   async changeRootFolder(value: string) {

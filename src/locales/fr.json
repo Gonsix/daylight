@@ -181,6 +181,7 @@
   "Daylight: 設定の保存に失敗しました。": "Daylight : impossible d’enregistrer les paramètres.",
   "設定を保存できませんでした。もう一度お試しください。": "Impossible d’enregistrer les paramètres. Réessayez.",
   "表示できませんでした。ビューを開き直してください。": "Impossible d’afficher le tableau de bord. Rouvrez la vue.",
+  "ダッシュボードを開く": "Ouvrir le tableau de bord",
   "Daylightを開く": "Ouvrir Daylight",
   "Daylight: フォルダの初期化に失敗しました。": "Daylight : impossible d’initialiser les dossiers.",
   "Daylightフォルダを準備できませんでした。設定の配置場所と書き込み権限を確認してください。": "Impossible de préparer les dossiers Daylight. Vérifiez l’emplacement et les droits d’écriture.",

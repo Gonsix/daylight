@@ -13,7 +13,7 @@ async function fixture(){
   const files=new Map<string,TFile|TFolder>(),renames:string[][]=[];
   const app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getAbstractFileByPath:(p:string)=>files.get(p),createFolder:async(p:string)=>{if(files.has(p))throw new Error('exists');const f=new TFolder(p);files.set(p,f);return f;},create:async(p:string,c:string)=>{if(files.has(p))throw new Error('exists');const f=new TFile(p,c);files.set(p,f);return f;}},fileManager:{renameFile:async(f:TFolder,next:string)=>{if(files.has(next))throw new Error('exists');const old=f.path;renames.push([old,next]);for(const [key,value]of [...files])if(key===old||key.startsWith(old+'/')){files.delete(key);value.path=next+key.slice(old.length);files.set(value.path,value);}}}};
   const require=createRequire(path.join(process.cwd(),'package.json'));
-  const modules=(await compiled).outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder}:require(id),console,Intl,Date});return module.exports;});
+  const modules=(await compiled).outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,window:{setTimeout,clearTimeout},require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder}:require(id),console,Intl,Date});return module.exports;});
   return {files,renames,app,storage:new modules[0].DaylightStorage(app),Storage:modules[0].DaylightStorage,Store:modules[1].DaylightStore,normalize:modules[0].storageRoot};
 }
 test('first install creates all folders and complete bundled templates without overwriting edits',async()=>{

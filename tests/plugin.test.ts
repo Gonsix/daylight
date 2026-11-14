@@ -7,7 +7,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
-async function loadPlugin(saved: any = null, existing: any[] = [], storageError?: Error) {
+async function loadPlugin(saved: any = null, existing: any[] = [], storageError?: Error, modernSettings = false) {
   const result=await build({loader:{'.md':'text'},entryPoints:[path.resolve('src/main.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
   const registrations:any={notices:[],errors:[]};
   let layoutReady=false;
@@ -27,8 +27,8 @@ async function loadPlugin(saved: any = null, existing: any[] = [], storageError?
   const storageFiles=new Map<string,any>();
   class MarkdownRenderChild { constructor(public containerEl:any){} }
   const require=createRequire(path.join(process.cwd(),'package.json'));const module={exports:{} as any};
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,setTimeout,clearTimeout,
-    require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder,addIcon:()=>{},Plugin,PluginSettingTab:class { containerEl:any; constructor(..._args:any[]){} },Setting:class { setName(name:string){(registrations.settingNames??=[]).push(name);return this;} setDesc(){return this;} addText(){return this;} addButton(){return this;} addToggle(){return this;} addDropdown(callback:any){const dropdown={selectEl:{replaceChildren:()=>{registrations.languageOptions={};},setAttribute:()=>{}},addOption:(value:string,label:string)=>{registrations.languageOptions[value]=label;return dropdown;},setValue:(value:string)=>{registrations.selectedLanguage=value;return dropdown;},onChange:(handler:any)=>{registrations.changeLanguage=handler;return dropdown;}};registrations.languageOptions={'ar':'العربية','en-GB':'English (GB)'};callback(dropdown);return this;} },Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,window:{setTimeout,clearTimeout},console:{...console,error:(...args:any[])=>registrations.errors.push(args)},Intl,Date,setTimeout,clearTimeout,
+    require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{TFile,TFolder,requireApiVersion:()=>modernSettings,addIcon:()=>{},Plugin,PluginSettingTab:class { update(){registrations.settingsUpdated=(registrations.settingsUpdated??0)+1;} containerEl:any; constructor(..._args:any[]){} },Setting:class { setName(name:string){(registrations.settingNames??=[]).push(name);return this;} setDesc(){return this;} addText(){return this;} addButton(){return this;} addToggle(){return this;} addDropdown(callback:any){const dropdown={selectEl:{replaceChildren:()=>{registrations.languageOptions={};},setAttribute:()=>{}},addOption:(value:string,label:string)=>{registrations.languageOptions[value]=label;return dropdown;},setValue:(value:string)=>{registrations.selectedLanguage=value;return dropdown;},onChange:(handler:any)=>{registrations.changeLanguage=handler;return dropdown;}};registrations.languageOptions={'ar':'العربية','en-GB':'English (GB)'};callback(dropdown);return this;} },Notice:class {constructor(message:string){registrations.notices.push(message);}},Modal:class{},ItemView:class{},MarkdownRenderChild,parseYaml:(text:string)=>({date:text.split(':').slice(1).join(':').trim().replaceAll('"','')})}:require(id)});
   const plugin=new module.exports.default();
   plugin.app={metadataCache:{on:()=>({})},vault:{on:()=>({}),getMarkdownFiles:()=>[],getAbstractFileByPath:(path:string)=>storageFiles.get(path),createFolder:async(path:string)=>{if(!layoutReady)throw new Error('Vault not ready');if(storageError)throw storageError;storageFiles.set(path,new TFolder(path));},create:async(path:string)=>{const file=new TFile(path);storageFiles.set(path,file);return file;}},workspace:{onLayoutReady:(callback:any)=>{registrations.ready=()=>{layoutReady=true;return callback();};},getLeavesOfType:()=>existing,getLeaf:()=>({setViewState:async(state:any)=>{registrations.opened=state;}}),revealLeaf:async(leaf:any)=>{registrations.revealed=leaf;}}};
   await plugin.onload();
@@ -40,7 +40,7 @@ test('plugin loads and registers independent view, command and date-aware Markdo
   assert.equal(registrations.view.type,'daylight');assert.equal(registrations.markdown.type,'daylight');
   assert.equal(registrations.view.factory({}).getDisplayText(),'Daylight');
   assert.equal(registrations.command.id,'open-daylight');
-  assert.equal(registrations.command.name,'Open Daylight');
+  assert.equal(registrations.command.name,'Open dashboard');
   assert.equal(typeof registrations.markdowns['vault-dashboard'],'function');
   registrations.command.callback();await new Promise(resolve=>setTimeout(resolve,0));
   assert.equal(registrations.opened.type,'daylight');
@@ -228,4 +228,27 @@ test('Daylight language selector contains only the registered dictionaries', asy
   await registrations.changeLanguage('de');
   assert.equal(registrations.saved.language, 'de');
   assert.equal(Object.keys(registrations.languageOptions).length, 9);
+});
+
+
+test('malformed saved settings fall back to valid defaults without preventing startup', async () => {
+  for (const saved of [[], 42, 'invalid', { sortOrderGap: '100', language: [] }]) {
+    const { plugin, registrations } = await loadPlugin(saved);
+    assert.equal(plugin.settings.sortOrderGap, 10000);
+    assert.equal(plugin.settings.language, 'en');
+    await registrations.ready();
+    assert.equal(plugin.store.isReady(), true);
+  }
+});
+
+test('settings expose searchable definitions and refresh through the modern API when supported', async () => {
+  const { registrations } = await loadPlugin(null, [], undefined, true);
+  const tab = registrations.settingsTab;
+  assert.equal(tab.getSettingDefinitions().length, 4);
+  assert.ok(tab.getSettingDefinitions().every((row: any) => row.name && typeof row.render === 'function'));
+  tab.containerEl = { empty() {} };
+  tab.display();
+  await registrations.changeLanguage('de');
+  assert.equal(registrations.settingsUpdated, 1);
+  assert.equal(tab.getSettingDefinitions()[0].name, 'Sprache');
 });

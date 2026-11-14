@@ -1,3 +1,4 @@
+import { isRecord, stringList } from './value';
 import { t } from './i18n';
 import { dateTime, dayKey, isStatus, localTimestamp, parseWorkSessions, timeLabel, validDay, WorkSession } from './model';
 import { recordWorkStatus, serializeWorkSessions, syncWorkFields } from './execution';
@@ -15,11 +16,10 @@ export function taskDocument(content: string, yaml: YamlAdapter) {
   const match=content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if(!match)throw new Error(t("タスクのフロントマターを確認してください。"));
   const fm=yaml.parse(match[1]);
-  if(!fm || typeof fm!=='object' || Array.isArray(fm))throw new Error(t("タスクの属性を確認してください。"));
-  const tags=(Array.isArray(fm.tags)?fm.tags:typeof fm.tags==='string'?fm.tags.split(/[,\s]+/):[])
-    .filter((t:unknown):t is string=>typeof t==='string').map((t:string)=>t.replace(/^#/,''));
+  if(!isRecord(fm))throw new Error(t("タスクの属性を確認してください。"));
+  const tags=stringList(fm.tags).map((t:string)=>t.replace(/^#/,''));
   if(!tags.includes('task')||tags.includes('event')||tags.includes('project'))throw new Error(t("タスクノートではないため編集できません。"));
-  return {fm:fm as Record<string,unknown>,body:content.slice(match[0].length),newline:content.includes('\r\n')?'\r\n':'\n'};
+  return {fm:fm,body:content.slice(match[0].length),newline:content.includes('\r\n')?'\r\n':'\n'};
 }
 export function localDateTime(value: unknown): string {
   const time=dateTime(value);if(time===null)return '';
@@ -53,7 +53,8 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
     if(!key.trim()||/[\r\n\0]/.test(key))throw new Error(t("プロパティ名を確認してください。"));
     if(!equal(fm[key],snapshot.properties[key]))throw new Error(t("{0}が更新されています。再読み込みしてください。", PROPERTY_LABELS[key]||key));
   }
-  const next=Object.fromEntries([...Object.entries(fm),...keys.map(key=>[key,changes[key]])]);
+  const next: Record<string, unknown> = { ...fm };
+  for (const key of keys) next[key] = changes[key];
   if(keys.includes('status') && (typeof next.status!=='string'||!isStatus(next.status)))throw new Error(t("状態を選択してください。"));
   if(keys.includes('target_date')) {
     if(next.target_date===null||next.target_date==='')next.target_date=null;

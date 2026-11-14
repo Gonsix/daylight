@@ -73,19 +73,27 @@ Open task details to edit dates, deadlines, links, and custom properties. Add a 
 
 Tasks, events, and projects are Markdown files you can open and edit normally. Daylight runs locally without a separate account or server. Light and dark themes, desktop layouts, and a stacked task board on phones are supported.
 
+## Privacy and compatibility
+
+- **Works offline:** the plugin makes no network requests and includes no telemetry, ads, payments, or account requirement.
+- **Vault storage:** notes, templates, and plugin settings stay inside your vault. The plugin does not access files outside the vault. Obsidian Sync or another sync service you enable operates separately.
+- **Platforms:** desktop and mobile, with Obsidian **1.8.7 or later**. Both light and dark themes are supported.
+
 ## Install
 
 Daylight requires **Obsidian 1.8.7 or later**. Manual installation is currently supported; community plugin listing is being prepared.
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from [GitHub Releases](https://github.com/Gonsix/daylight/releases).
-2. Create `.obsidian/plugins/daylight/` inside your vault and place the three files there.
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest GitHub release](https://github.com/Gonsix/daylight/releases/latest).
+2. Create `.obsidian/plugins/daylight/` inside your vault and place the three files there. If you customized Obsidian's configuration folder, use that folder instead of `.obsidian`.
 3. Restart Obsidian, then enable **Daylight** in **Settings → Community plugins**.
+
+For an update, replace those same three files and reload Daylight; keep your existing `data.json`. See the [changelog](CHANGELOG.md) for changes.
 
 For the current source version or local development, see [Build from source](#build-from-source).
 
 ## Your first day with Daylight
 
-1. **Open your dashboard.** Use the sunrise ribbon icon or run **Daylight: Open Daylight** from the command palette.
+1. **Open your dashboard.** Use the sunrise ribbon icon or run **Daylight: Open dashboard** from the command palette.
 2. **Add something to do.** Use **＋** in the task section. Choose a date, project, and optional scheduled time or deadline.
 3. **Make room for it.** Select a range on the timeline to add an event.
 4. **Work and review.** Start a task, pause for a break, and finish it when done. Check the work sessions and your completed cards.
@@ -132,11 +140,13 @@ If you omit `date`, notes in `daily_notes/01_daily/YYYY-MM-DD.md` use the date i
 - **Notes save when you submit.** Unsaved note drafts stay while switching items in the same view, but are lost when that view closes.
 - **Deleting removes the source note.** Daylight uses Obsidian's trash behavior. Deleting a project does not delete its tasks or events.
 - **Keep a backup before getting started.** Daylight edits the notes stored in your vault.
+- **Templates:** only the built-in date and frontmatter template tokens are expanded; arbitrary Templater JavaScript is not executed.
+- **Touch devices:** use the status and parent selectors when drag and drop is unavailable.
 - **Current limits:** Google Calendar sync and dragging an existing event to reschedule it are not included. Open the event form to change its time.
 
 ## Build from source
 
-With Git, Node.js, npm, and Bash installed:
+With Git, Node.js 22 LTS (22.13+) or Node.js 24+, npm, and Bash installed:
 
 ```sh
 git clone https://github.com/Gonsix/daylight.git
@@ -151,10 +161,11 @@ The script installs dependencies if needed, builds the plugin, and copies its th
 
 ```sh
 npm ci
-npm run check
-npm test
-npm run build
+npm run validate
+npm run release:prepare
 ```
+
+Validation runs official Obsidian lint checks, TypeScript, tests, and the production build. Release preparation also checks version consistency, runtime dependencies, and bundled licenses. See the [release guide](docs/releasing.md).
 
 See the [feature specifications](docs/specs/README.md) for storage, startup, task execution, and localization details. The specifications are currently written in Japanese.
 
@@ -168,4 +179,4 @@ Found a problem or have an idea? [Open an issue](https://github.com/Gonsix/dayli
 
 Copyright © 2026 Gonsix. Daylight is released under the [MIT License](LICENSE).
 
-Third-party dependencies and Obsidian branding retain their respective licenses and terms. Daylight is an independent community project and is not affiliated with or endorsed by Obsidian.
+React, React DOM, and Scheduler are bundled under the MIT license; see [third-party notices](THIRD_PARTY_NOTICES.md). Obsidian branding retains its own terms. Daylight is an independent community project and is not affiliated with or endorsed by Obsidian.

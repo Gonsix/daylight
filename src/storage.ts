@@ -1,3 +1,4 @@
+import { hasControlCharacters } from './value';
 import { t } from './i18n';
 import { App, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { Kind } from './model';
@@ -10,7 +11,7 @@ const FOLDERS: Record<Kind,string> = { task:'Tasks', event:'Events', project:'Pr
 const TEMPLATES = { Task:taskTemplate, Event:eventTemplate, Project:projectTemplate };
 export function storageRoot(value: string): string {
   const path=value.trim().replace(/\\/g,'/').replace(/\/+/g,'/').replace(/^\/|\/$/g,'');
-  if (!path || /[:*?"<>|\x00-\x1f]/.test(path) || path.split('/').some(p=>p.startsWith('.') || !p)) throw new Error(t("Vault内のフォルダを指定してください（例: Daylight / etc/Daylight）。"));
+  if (!path || /[:*?"<>|]/.test(path) || hasControlCharacters(path) || path.split('/').some(p=>p.startsWith('.') || !p)) throw new Error(t("Vault内のフォルダを指定してください（例: Daylight / etc/Daylight）。"));
   return path;
 }
 export async function ensureFolder(app: App, path: string): Promise<void> {
