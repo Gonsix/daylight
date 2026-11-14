@@ -1,5 +1,6 @@
+import type { TargetedMouseEvent, TargetedDragEvent } from 'preact';
 import { t, useLanguage } from './i18n';
-import React, { CSSProperties, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'preact/compat';
 import { Notice, Platform } from 'obsidian';
 import { childTasks, canParent } from './hierarchy';
 import { isTaskRunning, workDuration } from './execution';
@@ -19,7 +20,7 @@ export function kanbanTasks(items: Item[], day: string, tab: TaskTab): Item[] {
   if (tab === 'day') rows.push(...carryovers(items,day).filter(i => i.kind === 'task'),...completedTasks(items,day));
   return [...new Map(rows.map(i => [i.path,i])).values()];
 }
-export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: { items: Item[]; allItems?: Item[]; store: DaylightStore; onSelect: (path: string, event?: React.MouseEvent) => void; onAddTask?: (status: Status) => void }) {
+export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: { items: Item[]; allItems?: Item[]; store: DaylightStore; onSelect: (path: string, event?: TargetedMouseEvent<HTMLElement>) => void; onAddTask?: (status: Status) => void }) {
   useLanguage();
   const [showOther,setShowOther] = useState(false), [over,setOver] = useState(''), [busy,setBusy] = useState<string | null>(null);
   const [menu,setMenu] = useState<string | null>(null), [query,setQuery] = useState('');
@@ -65,12 +66,12 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
     catch(e) { new Notice((e as Error).message); }
     finally {saving.current=false;setBusy(null);}
   };
-  const parentDragOver = (e: React.DragEvent, target: Item) => {
-    if (!dragged.current) return;
+  const parentDragOver = (e: TargetedDragEvent<HTMLElement>, target: Item) => {
+    if (!dragged.current || !e.dataTransfer) return;
     const rect=e.currentTarget.getBoundingClientRect(), fraction=(e.clientY-rect.top)/rect.height;
     if (dragged.current.status !== target.status && (fraction < 0.25 || fraction > 0.75)) { setParentOver(''); setOrderOver(null); return; }
     if (target.path !== dragged.current.path && (fraction < 0.25 || fraction > 0.75)) {
-      e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';setParentOver('');setOver('');
+      e.preventDefault();e.stopPropagation();if (e.dataTransfer) e.dataTransfer.dropEffect='move';setParentOver('');setOver('');
       setOrderOver({path:target.path,side:fraction < 0.25 ? 'before' : 'after'});return;
     }
     setOrderOver(null);
@@ -79,7 +80,7 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
       e.preventDefault();e.dataTransfer.dropEffect='link';setParentOver(target.path);
     } else { e.dataTransfer.dropEffect='none';setParentOver(''); }
   };
-  const parentDrop = (e: React.DragEvent, target: Item) => {
+  const parentDrop = (e: TargetedDragEvent<HTMLElement>, target: Item) => {
     e.preventDefault();e.stopPropagation();
     const child=dragged.current;dragged.current=null;setDraggedCard(null);setParentOver('');setOver('');
     const placement=orderOver;setOrderOver(null);
@@ -92,15 +93,15 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
     } else if(child && canParent(allItems,child.path,target.path)) void assignParent(child,target.path);
   };
   return <div className="daylight-kanban-wrap">
-    <div className="daylight-kanban-tools"><label className="daylight-kanban-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" aria-label={t("カンバン内のタスクを検索")} placeholder={t("タスク名・プロジェクトで検索")} value={query} onChange={e => setQuery(e.target.value)} /></label><button type="button" aria-expanded={showOther} onClick={() => setShowOther(v => !v)}>{showOther ? t("保留・中止を隠す") : t("保留・中止を表示")}{otherCount > 0 ? ` (${otherCount})` : ''}</button></div>
+    <div className="daylight-kanban-tools"><label className="daylight-kanban-search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg><input type="search" aria-label={t("カンバン内のタスクを検索")} placeholder={t("タスク名・プロジェクトで検索")} value={query} onChange={e => setQuery(e.currentTarget.value)} /></label><button type="button" aria-expanded={showOther} onClick={() => setShowOther(v => !v)}>{showOther ? t("保留・中止を隠す") : t("保留・中止を表示")}{otherCount > 0 ? ` (${otherCount})` : ''}</button></div>
     <div className={`daylight-kanban${Platform?.isPhone ? ' daylight-kanban-phone' : ''}`} aria-label={t("タスクのカンバン")} tabIndex={0}>
       {columns.map(status => {
         const rows = orderedTasks(visibleItems.filter(i => status === 'unknown' ? !isStatus(i.status) : i.status === status));
         const label = isStatus(status) ? STATUS[status].label : t("状態未設定");
         const color = kanbanColor(status);
         return <section key={status} className={`daylight-kanban-column${over === status ? ' is-over' : ''}`} aria-label={t("{0}のタスク", label)}
-          style={{'--daylight-state':color} as CSSProperties}
-          onDragOver={e => { if (dragged.current && isStatus(status) && !saving.current) { e.preventDefault(); e.dataTransfer.dropEffect='move'; setOrderOver(null);setParentOver('');setOver(status); } }}
+          style={{'--daylight-state':color}}
+          onDragOver={e => { if (dragged.current && isStatus(status) && !saving.current) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect='move'; setOrderOver(null);setParentOver('');setOver(status); } }}
           onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { setOver('');setOrderOver(null);setParentOver(''); } }}
           onDrop={e => { e.preventDefault(); const item=dragged.current; dragged.current=null; setDraggedCard(null);setOrderOver(null);setParentOver('');setOver(''); if (item && isStatus(status)) void move(item,status); }}>
           <h3>{label}<span>{rows.length}</span></h3>
@@ -112,10 +113,10 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
               ? sessions.map((s, idx) => `${idx + 1}. ${dayKey(s.start)} ${timeLabel(s.start)} → ${s.end != null ? `${dayKey(s.end)} ${timeLabel(s.end)}` : t("実行中")}`).join('\n')
               : t("作業開始 {0} ／ 作業終了 {1}", displayStart != null ? `${dayKey(displayStart)} ${timeLabel(displayStart)}` : '未設定', displayEnd != null ? `${dayKey(displayEnd)} ${timeLabel(displayEnd)}` : '未設定');
             return <React.Fragment key={item.path}>
-            <div className={`daylight-kanban-insertion${orderOver?.path === item.path && orderOver.side === 'before' ? ' is-active' : ''}`} style={{'--daylight-insertion-height': `${draggedCard?.height ?? 0}px`} as CSSProperties} aria-hidden="true" onDragOver={e=>{if(orderOver?.path === item.path && orderOver.side==='before'){e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';}}} onDrop={e=>parentDrop(e,item)}><span>{t("ここに移動")}</span></div>
+            <div className={`daylight-kanban-insertion${orderOver?.path === item.path && orderOver.side === 'before' ? ' is-active' : ''}`} style={{'--daylight-insertion-height': `${draggedCard?.height ?? 0}px`}} aria-hidden="true" onDragOver={e=>{if(orderOver?.path === item.path && orderOver.side==='before'){e.preventDefault();e.stopPropagation();if (e.dataTransfer) e.dataTransfer.dropEffect='move';}}} onDrop={e=>parentDrop(e,item)}><span>{t("ここに移動")}</span></div>
             <article className={`daylight-kanban-card${parentOver === item.path ? ' is-parent-target' : ''}${draggedCard?.path === item.path ? ' is-dragging' : ''}`} onDragOver={e=>parentDragOver(e,item)} onDrop={e=>{if(dragged.current?.status !== item.status && parentOver !== item.path){setParentOver('');setOrderOver(null);return;} parentDrop(e,item);}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node|null))setParentOver('');}} draggable={!busy} aria-busy={busy === item.path}
             onClick={e => { if (!(e.target as Element).closest('button,select,input,textarea,label')) onSelect(item.path,e); }}
-            onDragStart={e => { if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; setDraggedCard({path:item.path,height:e.currentTarget.getBoundingClientRect().height}); e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-daylight-task',item.path); }}
+            onDragStart={e => { if (!e.dataTransfer) return; if ((e.target as Element).closest('button,select')) {e.preventDefault();return;} dragged.current=item; setDraggedCard({path:item.path,height:e.currentTarget.getBoundingClientRect().height}); e.stopPropagation(); e.dataTransfer.effectAllowed='all'; e.dataTransfer.setData('application/x-daylight-task',item.path); }}
             onDragEnd={() => { dragged.current=null;setDraggedCard(null);setOver('');setParentOver('');setOrderOver(null); }}>
             {parentOver === item.path && <span className="daylight-parent-drop-hint">{t("このタスクの子にする")}</span>}
             <div className="daylight-kanban-card-head"><span className={`daylight-kanban-card-state${item.status === 'done' ? ' is-done' : ''}`} aria-hidden="true">{item.status === 'done' && <CompletedIcon />}</span><span className="daylight-kanban-project">{item.projectLabel || t("タスク")}</span>
@@ -149,20 +150,20 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
             {!!children.get(item.path)?.length && <div className="daylight-child-tasks">
               <button type="button" className="daylight-child-toggle" aria-expanded={!collapsed.has(item.path)} onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(item.path))next.delete(item.path);else next.add(item.path);return next;})}>{t("サブタスク")}{' '}{children.get(item.path)!.filter(child=>child.status==='done').length}/{children.get(item.path)!.length}<span aria-hidden="true">{collapsed.has(item.path) ? '›' : '⌄'}</span></button>
               {!collapsed.has(item.path) && children.get(item.path)!.map(child=><button key={child.path} type="button" className={`daylight-child-row${parentOver === child.path ? ' is-parent-target' : ''}`} title={`${child.title} · ${isStatus(child.status) ? STATUS[child.status].label : child.status || t("未設定")}`} onClick={e=>onSelect(child.path,e)} onDragOver={e=>parentDragOver(e,child)} onDrop={e=>parentDrop(e,child)}>
-                <span className={`daylight-child-status${child.status === 'done' ? ' is-done' : ''}`} style={{'--daylight-child-state':kanbanColor(child.status)} as CSSProperties} aria-label={isStatus(child.status) ? STATUS[child.status].label : t("状態未設定")}>{child.status === 'done' && <CompletedIcon />}</span><span className="daylight-child-title">{child.title}</span>
+                <span className={`daylight-child-status${child.status === 'done' ? ' is-done' : ''}`} style={{'--daylight-child-state':kanbanColor(child.status)}} aria-label={isStatus(child.status) ? STATUS[child.status].label : t("状態未設定")}>{child.status === 'done' && <CompletedIcon />}</span><span className="daylight-child-title">{child.title}</span>
               </button>)}
             </div>}
             {menu === item.path && <div className="daylight-kanban-status-menu" role="group" aria-label={t("{0}の操作", item.title)}>
-              <label className="daylight-parent-picker"><span>{t("ステータス")}</span><select aria-label={t("{0}のステータス", item.title)} value={item.status} disabled={!!busy} onChange={e=>{const status=e.target.value;if(isStatus(status))void move(item,status);}}>
+              <label className="daylight-parent-picker"><span>{t("ステータス")}</span><select aria-label={t("{0}のステータス", item.title)} value={item.status} disabled={!!busy} onChange={e=>{const status=e.currentTarget.value;if(isStatus(status))void move(item,status);}}>
                 {!isStatus(item.status) && <option value={item.status}>{item.status || t("未設定")}</option>}
                 {Object.entries(STATUS).map(([value,state])=><option key={value} value={value}>{state.label}</option>)}
               </select></label>
-              <label className="daylight-parent-picker"><span>{t("プロジェクト")}</span><select aria-label={t("{0}のプロジェクト", item.title)} value={item.projectPath || ''} disabled={!!busy} onChange={e=>void assignProject(item,e.target.value)}>
+              <label className="daylight-parent-picker"><span>{t("プロジェクト")}</span><select aria-label={t("{0}のプロジェクト", item.title)} value={item.projectPath || ''} disabled={!!busy} onChange={e=>void assignProject(item,e.currentTarget.value)}>
                 <option value="">{t("未設定")}</option>
                 {item.projectPath && !allItems.some(p=>p.kind==='project' && p.path===item.projectPath) && <option value={item.projectPath}>{item.projectLabel || item.projectPath}</option>}
                 {allItems.filter(p=>p.kind==='project' && (!p.archived || p.path===item.projectPath)).map(p=><option key={p.path} value={p.path}>{p.title}</option>)}
               </select></label>
-              <label className="daylight-parent-picker"><span>{t("親タスク")}</span><select aria-label={t("{0}の親タスク", item.title)} value={item.parentTaskPath || ''} disabled={!!busy} onChange={e=>void assignParent(item,e.target.value)}>
+              <label className="daylight-parent-picker"><span>{t("親タスク")}</span><select aria-label={t("{0}の親タスク", item.title)} value={item.parentTaskPath || ''} disabled={!!busy} onChange={e=>void assignParent(item,e.currentTarget.value)}>
                 <option value="">{t("親なし")}</option>
                 {item.parentTaskPath && !allItems.some(p=>p.path===item.parentTaskPath) && <option value={item.parentTaskPath}>{item.parentTaskLabel || item.parentTaskPath}</option>}
                 {allItems.filter(p=>p.kind==='task' && canParent(allItems,item.path,p.path)).map(p=><option key={p.path} value={p.path}>{p.title} · {p.targetDate || t("予定日未定")}</option>)}
@@ -170,7 +171,7 @@ export function Kanban({ items, allItems = items, store, onSelect, onAddTask }: 
             </div>}
 
           </article>
-          <div className={`daylight-kanban-insertion${orderOver?.path === item.path && orderOver.side === 'after' ? ' is-active' : ''}`} style={{'--daylight-insertion-height': `${draggedCard?.height ?? 0}px`} as CSSProperties} aria-hidden="true" onDragOver={e=>{if(orderOver?.path === item.path && orderOver.side==='after'){e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';}}} onDrop={e=>parentDrop(e,item)}><span>{t("ここに移動")}</span></div>
+          <div className={`daylight-kanban-insertion${orderOver?.path === item.path && orderOver.side === 'after' ? ' is-active' : ''}`} style={{'--daylight-insertion-height': `${draggedCard?.height ?? 0}px`}} aria-hidden="true" onDragOver={e=>{if(orderOver?.path === item.path && orderOver.side==='after'){e.preventDefault();e.stopPropagation();if (e.dataTransfer) e.dataTransfer.dropEffect='move';}}} onDrop={e=>parentDrop(e,item)}><span>{t("ここに移動")}</span></div>
           </React.Fragment>;})}
           {!rows.length && <p className="daylight-kanban-empty">{t("タスクなし")}</p>}
           {onAddTask && isStatus(status) && <div className="daylight-kanban-add-zone"><button type="button" className="daylight-kanban-add" aria-label={t("{0}にタスクを追加", label)} onClick={()=>onAddTask(status)}>{t("＋ 追加")}</button></div>}

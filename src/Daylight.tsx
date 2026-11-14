@@ -1,6 +1,7 @@
+import type { CSSProperties, TargetedMouseEvent } from 'preact';
 import { errorMessage } from './value';
 import { DEFAULT_LANGUAGE, Language, t, translate, useLanguage } from './i18n';
-import React, { CSSProperties, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'preact/compat';
 import { Notice } from 'obsidian';
 import { DaylightStore } from './store';
 import { DatePicker } from './DatePicker';
@@ -33,7 +34,7 @@ function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
   const [busy, setBusy] = useState(false);
   return <select className="daylight-status" style={stateColor(item)} aria-label={t("{0}の状態", item.title)} value={item.status} disabled={busy}
     onClick={e => e.stopPropagation()} onChange={e => { void (async () => {
-      const next = e.target.value; setBusy(true);
+      const next = e.currentTarget.value; setBusy(true);
       try { await store.setStatus(item, next); } catch (e) { new Notice((e as Error).message); }
       finally { setBusy(false); }
     })(); }}>
@@ -41,7 +42,7 @@ function StatusSelect({ item, store }: { item: Item; store: DaylightStore }) {
     {Object.entries(STATUS).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
   </select>;
 }
-function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string, event?: React.MouseEvent) => void; projectPath: string }) {
+function Timeline({ items, day, now, store, onSelect, projectPath }: { items: Item[]; day: string; now: number; store: DaylightStore; onSelect: (path: string, event?: TargetedMouseEvent<HTMLElement>) => void; projectPath: string }) {
   useLanguage();
   const candidates = useMemo(() => timelineCandidates(items, day), [items, day]);
   const running = useMemo(() => candidates.some(isTaskRunning), [candidates]);
@@ -149,7 +150,7 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
       try { await store.memo(item.path, text); onSaved(text); setNotes(await store.notes(item.path)); }
       catch (e) { setError((e as Error).message); } finally { memoSaving.current=false;setBusy(false); }
     })(); }}>
-      <textarea value={draft} onChange={e => onDraft(e.target.value)} aria-label={t("メモを追記")} placeholder={t("メモを追記…")} rows={4} />
+      <textarea value={draft} onChange={e => onDraft(e.currentTarget.value)} aria-label={t("メモを追記")} placeholder={t("メモを追記…")} rows={4} />
       {error && <p className="daylight-error" role="alert">{error}</p>}
       <div className="daylight-detail-save-actions">{item.kind === 'project' && <button type="button" className="daylight-detail-delete" disabled={busy} onClick={() => openDeleteNoteModal(store,item,onClose)}>{t("削除")}</button>}<button className="daylight-save" type="submit" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy || !draft.trim()}>{busy ? t("保存中…") : t("追加")}</button></div>
     </form>
@@ -168,8 +169,8 @@ function Loading({ language }: { language: Language }) {
 export function Daylight({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
   useLanguage();
   const readySnapshot = store.isReady ?? alwaysReady;
-  const ready = useSyncExternalStore(store.subscribe, readySnapshot, readySnapshot);
-  useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
+  const ready = useSyncExternalStore(store.subscribe, readySnapshot);
+  useSyncExternalStore(store.subscribe, store.snapshot);
   const language = store.language ?? DEFAULT_LANGUAGE;
   if (!ready) return <Loading language={language} />;
   return <PreparedDashboard store={store} initialDate={initialDate} />;
@@ -198,7 +199,7 @@ function PreparedDashboard({ store, initialDate }: { store: DaylightStore; initi
 
 function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore; initialDate?: string | null }) {
   useLanguage();
-  const revision = useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
+  const revision = useSyncExternalStore(store.subscribe, store.snapshot);
   const items = useMemo(() => store.items(), [store, revision]);
   const [now, setNow] = useState(Date.now());
   useEffect(() => { setNow(Date.now()); }, [revision]);
@@ -209,7 +210,7 @@ function DaylightDashboard({ store, initialDate = null }: { store: DaylightStore
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const root = useRef<HTMLDivElement>(null), focusReturn = useRef<HTMLElement | null>(null);
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(id); }, []);
-  const select = (path: string, event?: React.MouseEvent) => {
+  const select = (path: string, event?: TargetedMouseEvent<HTMLElement>) => {
     if (event && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void store.open(path, true).catch(e => new Notice(errorMessage(e))); return; }
     if (store.items().find(i => i.path === path)?.kind === 'event') { openEditEventModal(store,path); return; }
     focusReturn.current = root.current?.ownerDocument.activeElement as HTMLElement; setSelected(path);

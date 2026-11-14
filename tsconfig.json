@@ -1,9 +1,25 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler",
-    "lib": ["DOM", "ES2022"], "jsx": "react-jsx", "strict": true,
-    "resolveJsonModule": true, "esModuleInterop": true, "skipLibCheck": true, "noEmit": true,
-    "types": ["node"]
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "DOM",
+      "ES2022"
+    ],
+    "jsx": "react-jsx",
+    "strict": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ],
+    "jsxImportSource": "preact"
   },
-  "include": ["src", "tests"]
+  "include": [
+    "src",
+    "tests"
+  ]
 }

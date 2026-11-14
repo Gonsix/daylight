@@ -1,5 +1,5 @@
 import { locale, t, useLanguage } from './i18n';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'preact/compat';
 import { dayStart, hasSchedule, Item, monthDays, moveDay, moveMonth } from './model';
 
 function Chevron({ right = false }: { right?: boolean }) {
@@ -44,8 +44,8 @@ export function DatePicker({ day, today, items, onChange }: { day: string; today
       <div className="daylight-calendar-head">
         <button className="daylight-icon-button" aria-label={t("前の月")} onClick={() => changeMonth(moveMonth(month.slice(0,7) + '-01', -1))}><Chevron /></button>
         <div className="daylight-calendar-month">
-          <select aria-label={t("年")} value={year} onChange={e => changeMonth(`${e.target.value}-${String(monthIndex).padStart(2,'0')}-01`)}>{years.map(y => <option key={y} value={y}>{t("{0}年", y)}</option>)}</select>
-          <select aria-label={t("月の選択")} value={monthIndex} onChange={e => changeMonth(`${year}-${e.target.value.padStart(2,'0')}-01`)}>{Array.from({length:12},(_,i) => <option key={i} value={i+1}>{new Intl.DateTimeFormat(locale(), {month: "short"}).format(new Date(2026,i,1))}</option>)}</select>
+          <select aria-label={t("年")} value={year} onChange={e => changeMonth(`${e.currentTarget.value}-${String(monthIndex).padStart(2,'0')}-01`)}>{years.map(y => <option key={y} value={y}>{t("{0}年", y)}</option>)}</select>
+          <select aria-label={t("月の選択")} value={monthIndex} onChange={e => changeMonth(`${year}-${e.currentTarget.value.padStart(2,'0')}-01`)}>{Array.from({length:12},(_,i) => <option key={i} value={i+1}>{new Intl.DateTimeFormat(locale(), {month: "short"}).format(new Date(2026,i,1))}</option>)}</select>
         </div>
         <button className="daylight-icon-button" aria-label={t("次の月")} onClick={() => changeMonth(moveMonth(month.slice(0,7) + '-01', 1))}><Chevron right /></button>
       </div>

@@ -1,6 +1,6 @@
 import { errorMessage, valueText } from './value';
 import { t, useLanguage } from './i18n';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'preact/compat';
 import { parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStore } from './store';
 import { dateValue, isStatus, Item, STATUS } from './model';
@@ -31,24 +31,24 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     const current=value(key),kind=type(key),label=PROPERTY_LABELS[key]||key;
     const text=valueText(current);
     let control:React.ReactNode;
-    if(kind==='status')control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value)}>
+    if(kind==='status')control=<select value={text} aria-label={label} onChange={e=>change(key,e.currentTarget.value)}>
       {!isStatus(text)&&<option value={text}>{text||t("未設定")}</option>}{Object.entries(STATUS).map(([id,s])=><option key={id} value={id}>{s.label}</option>)}</select>;
     else if(kind==='project'||kind==='parent_task') {
       const candidates=links.filter(i=>i.kind===(kind==='project'?'project':'task')&&i.path!==item.path);
       const options=candidates.map(i=>({value:`[[${i.path.replace(/\.md$/,'')}]]`,label:i.title+(kind==='parent_task'?` · ${i.targetDate||t("予定日未定")}`:'')}));
       const originalLabel=kind==='project'&&item.projectLabel?item.projectLabel:text.replace(/^\[\[|\]\]$/g,'');
-      control=<select value={text} aria-label={label} onChange={e=>change(key,e.target.value||null)}><option value="">{t("未設定")}</option>
+      control=<select value={text} aria-label={label} onChange={e=>change(key,e.currentTarget.value||null)}><option value="">{t("未設定")}</option>
         {text&&!options.some(o=>o.value===text)&&<option value={text}>{originalLabel||t("現在の設定")}</option>}
         {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>;
-    } else if(kind==='boolean')control=<select value={valueText(current)} aria-label={label} onChange={e=>change(key,e.target.value===''?null:e.target.value==='true')}><option value="">{t("未設定")}</option><option value="true">{t("はい")}</option><option value="false">{t("いいえ")}</option></select>;
-    else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder={t("1行に1項目")} value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.target.value)} />;
-    else if(kind==='yaml')control=<textarea className="daylight-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.target.value)} />;
+    } else if(kind==='boolean')control=<select value={valueText(current)} aria-label={label} onChange={e=>change(key,e.currentTarget.value===''?null:e.currentTarget.value==='true')}><option value="">{t("未設定")}</option><option value="true">{t("はい")}</option><option value="false">{t("いいえ")}</option></select>;
+    else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder={t("1行に1項目")} value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.currentTarget.value)} />;
+    else if(kind==='yaml')control=<textarea className="daylight-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.currentTarget.value)} />;
     else if(kind==='datetime') {
       const local=localDateTime(current);
-      control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>change(key,e.target.value||null)} />;
-    } else if(kind==='date')control=<input type="date" aria-label={label} value={dateValue(current)} onChange={e=>change(key,e.target.value||null)} />;
-    else if(kind==='number')control=<input type="number" step="any" aria-label={label} value={text} onChange={e=>change(key,e.target.value)} />;
-    else control=<input type="text" aria-label={label} value={text} onChange={e=>change(key,e.target.value)} />;
+      control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>change(key,e.currentTarget.value||null)} />;
+    } else if(kind==='date')control=<input type="date" aria-label={label} value={dateValue(current)} onChange={e=>change(key,e.currentTarget.value||null)} />;
+    else if(kind==='number')control=<input type="number" step="any" aria-label={label} value={text} onChange={e=>change(key,e.currentTarget.value)} />;
+    else control=<input type="text" aria-label={label} value={text} onChange={e=>change(key,e.currentTarget.value)} />;
     return <label className="daylight-form-field daylight-property-field" key={key}><span>{label}{kind==='yaml'&&<small>YAML</small>}</span>{control}</label>;
   };
   return <form className="daylight-task-properties" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current)} onSubmit={e=>{ void (async () => {
@@ -75,8 +75,8 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
       {TASK_FIELDS.map(field)}
       <div className="daylight-extra-properties">{keys.filter(k=>!TASK_FIELDS.includes(k)).map(field)}</div>
       {adding?<div className="daylight-new-property">
-        <input autoFocus aria-label={t("新しいプロパティ名")} placeholder={t("プロパティ名")} value={name} onChange={e=>setName(e.target.value)} />
-        <select aria-label={t("新しいプロパティの種類")} value={newType} onChange={e=>setNewType(e.target.value)}>{[['text',t("テキスト")],['number',t("数値")],['boolean',t("チェック")],['date',t("日付")],['datetime',t("日時")],['list',t("リスト")],['yaml',t("構造化データ")]].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
+        <input autoFocus aria-label={t("新しいプロパティ名")} placeholder={t("プロパティ名")} value={name} onChange={e=>setName(e.currentTarget.value)} />
+        <select aria-label={t("新しいプロパティの種類")} value={newType} onChange={e=>setNewType(e.currentTarget.value)}>{[['text',t("テキスト")],['number',t("数値")],['boolean',t("チェック")],['date',t("日付")],['datetime',t("日時")],['list',t("リスト")],['yaml',t("構造化データ")]].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>
         <button type="button" onClick={()=>{const key=name.trim();if(!key||keys.includes(key)||/[\r\n\0]/.test(key)){setError(t("重複しないプロパティ名を入力してください。"));return;}setTypes(prev=>({...prev,[key]:newType==='boolean'?'checkbox':newType}));change(key,newType==='yaml'?{}:newType==='list'?[]:null);setAdding(false);setName('');}}>{t("追加")}</button>
         <button type="button" onClick={()=>setAdding(false)}>×</button>
       </div>:<button type="button" className="daylight-add-property" onClick={()=>setAdding(true)}>{t("＋ プロパティ")}</button>}

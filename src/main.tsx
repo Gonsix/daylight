@@ -1,7 +1,8 @@
 import { isRecord, valueText } from './value';
 import { DEFAULT_LANGUAGE, LANGUAGE_INFO, LANGUAGES, Language, parseLanguage, setLanguage, subscribeLanguage, t, translate } from './i18n';
-import React from 'react';
-import { createRoot, Root } from 'react-dom/client';
+import React from 'preact/compat';
+import { createRoot } from 'preact/compat/client';
+type Root = ReturnType<typeof createRoot>;
 import { ItemView, MarkdownRenderChild, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, addIcon, parseYaml, requireApiVersion } from 'obsidian';
 import { Daylight } from './Daylight';
 import { DaylightStore } from './store';

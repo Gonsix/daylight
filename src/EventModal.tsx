@@ -1,6 +1,7 @@
 import { subscribeLanguage, t, useLanguage } from './i18n';
-import React, { useRef, useState } from 'react';
-import { createRoot, Root } from 'react-dom/client';
+import React, { useRef, useState } from 'preact/compat';
+import { createRoot } from 'preact/compat/client';
+type Root = ReturnType<typeof createRoot>;
 import { Modal, Notice } from 'obsidian';
 import { DaylightStore } from './store';
 import { EventInput, EventSnapshot, KEEP_PROJECT, validateEvent } from './event';
@@ -27,23 +28,23 @@ export function EventForm({ store, seed, close, snapshot }: { store: DaylightSto
     catch (e) { setError((e as Error).message); saving.current = false; setBusy(false); }
   })(); }}>
     <fieldset disabled={busy} className="daylight-event-fields">
-    <label className="daylight-form-field daylight-title-field"><span>{t("タイトル")}</span><input autoFocus required maxLength={120} value={input.title} onChange={e => set('title',e.target.value)} placeholder={t("予定のタイトル")} /></label>
+    <label className="daylight-form-field daylight-title-field"><span>{t("タイトル")}</span><input autoFocus required maxLength={120} value={input.title} onChange={e => set('title',e.currentTarget.value)} placeholder={t("予定のタイトル")} /></label>
     <div className="daylight-form-times">
-      <label className="daylight-form-field"><span>{t("開始")}</span><input type="datetime-local" required step={60} value={input.start} onChange={e => set('start',e.target.value)} /></label>
-      <label className="daylight-form-field"><span>{t("終了")}</span><input type="datetime-local" required step={60} value={input.end} onChange={e => set('end',e.target.value)} /></label>
+      <label className="daylight-form-field"><span>{t("開始")}</span><input type="datetime-local" required step={60} value={input.start} onChange={e => set('start',e.currentTarget.value)} /></label>
+      <label className="daylight-form-field"><span>{t("終了")}</span><input type="datetime-local" required step={60} value={input.end} onChange={e => set('end',e.currentTarget.value)} /></label>
     </div>
     {rangeError && <p className="daylight-error" role="alert">{rangeError}</p>}
     <div className="daylight-form-times">
-      <label className="daylight-form-field"><span>{t("プロジェクト")}</span><select value={input.projectPath} onChange={e => set('projectPath',e.target.value)}><option value="">{t("未設定")}</option>
+      <label className="daylight-form-field"><span>{t("プロジェクト")}</span><select value={input.projectPath} onChange={e => set('projectPath',e.currentTarget.value)}><option value="">{t("未設定")}</option>
         {seed.projectPath === KEEP_PROJECT && <option value={KEEP_PROJECT}>{snapshot?.projectLabel || t("現在の設定")}</option>}
         {seed.projectPath && seed.projectPath !== KEEP_PROJECT && !projects.some(p => p.path === seed.projectPath) && <option value={seed.projectPath}>{snapshot?.projectLabel || seed.projectPath}</option>}
         {projects.map(p => <option key={p.path} value={p.path}>{p.title}</option>)}</select></label>
-      <label className="daylight-form-field"><span>{t("状態")}</span><select value={input.status} onChange={e => set('status',e.target.value)}>
+      <label className="daylight-form-field"><span>{t("状態")}</span><select value={input.status} onChange={e => set('status',e.currentTarget.value)}>
         {!isStatus(input.status) && <option value={input.status}>{input.status || t("未設定")}</option>}
         {Object.entries(STATUS).map(([value,state]) => <option key={value} value={value}>{state.label}</option>)}</select></label>
     </div>
     {snapshot?.notes && <div className="daylight-existing-notes">{snapshot.notes}</div>}
-    <label className="daylight-form-field"><span>{snapshot ? t("メモを追記") : t("メモ")}</span><textarea rows={3} value={input.memo} onChange={e => set('memo',e.target.value)} /></label>
+    <label className="daylight-form-field"><span>{snapshot ? t("メモを追記") : t("メモ")}</span><textarea rows={3} value={input.memo} onChange={e => set('memo',e.currentTarget.value)} /></label>
     {error && <p className="daylight-error" role="alert">{error}</p>}
     {confirmDelete && <div className="daylight-delete-confirm" role="alert"><p>{t("予定ノートをゴミ箱に移します。")}</p><button type="button" onClick={() => setConfirmDelete(false)}>{t("戻る")}</button><button type="button" className="daylight-delete" onClick={() => { void (async () => {
       if (!snapshot || saving.current) return;

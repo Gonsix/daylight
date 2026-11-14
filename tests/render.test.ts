@@ -1,3 +1,4 @@
+import { uiRequire } from './preact-runtime';
 import * as i18n from '../src/i18n';
 i18n.setLanguage('ja');
 import { test } from 'node:test';
@@ -6,8 +7,8 @@ import { build } from 'esbuild';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import React from 'preact/compat';
+import { renderToStaticMarkup } from 'preact-render-to-string';
 import { dateTime, Item } from '../src/model';
 import { DatePicker } from '../src/DatePicker';
 
@@ -20,10 +21,10 @@ test('closed date picker does not scan items to calculate calendar counts', () =
   assert.ok(html.includes('日付を選択'));
 });
 
-test('React renders timeline, inline state menus, project and carried-over kanban cards without network or Obsidian runtime', async () => {
-  const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['./i18n','obsidian','react','react/*','react-dom/*']});
+test('Preact renders timeline, inline state menus, project and carried-over kanban cards without network or Obsidian runtime', async () => {
+  const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['./i18n','obsidian','preact','preact/*']});
   const module={exports:{} as any};const require=createRequire(path.join(process.cwd(),'package.json'));
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:uiRequire(id,require),console,Intl,Date});
   const base:Item={path:'notes/T.md',title:'実装タスク',kind:'task',status:'on_going',targetDate:'2026-11-06',start:dateTime('2026-11-06T09:00:00'),end:dateTime('2026-11-06T10:00:00'),due:null,projectPath:'notes/P.md',projectLabel:'研究',archived:false};
   const rows=[base,{...base,path:'notes/E.md',kind:'event',title:'研究ミーティング'}, {...base,path:'notes/P.md',title:'研究',kind:'project',start:null,end:null}, {...base,path:'notes/Old.md',title:'前日のタスク',targetDate:'2026-11-05',start:null,end:null},
     {...base,path:'notes/Done.md',title:'本日完了したタスク',status:'done',targetDate:'2026-11-01',completedAt:dateTime('2026-11-06T12:07:00')},
@@ -45,9 +46,9 @@ test('React renders timeline, inline state menus, project and carried-over kanba
 
 
 test('task and project composers render the appropriate fields with Command+Enter submit', async () => {
-  const result = await build({entryPoints:[path.resolve('src/CreateModal.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result = await build({entryPoints:[path.resolve('src/CreateModal.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const module={exports:{} as any}, require=createRequire(path.join(process.cwd(),'package.json'));
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:uiRequire(id,require),console,Intl,Date});
   const store={items:()=>[]};
   const task=renderToStaticMarkup(React.createElement(module.exports.CreateForm,{store,kind:'task',day:'2026-11-08',close:()=>{}}));
   for(const label of ['予定日（空欄で未定）','開始','終了','締切','親タスク','作成','キャンセル']) assert.ok(task.includes(label),label);
@@ -58,9 +59,9 @@ test('task and project composers render the appropriate fields with Command+Ente
 });
 
 test('kanban always renders, hides hold/cancelled columns, and preserves task scope', async () => {
-  const result=await build({entryPoints:[path.resolve('src/Daylight.tsx'),path.resolve('src/Kanban.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result=await build({entryPoints:[path.resolve('src/Daylight.tsx'),path.resolve('src/Kanban.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const require=createRequire(path.join(process.cwd(),'package.json'));
-  const modules=result.outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});return module.exports;});
+  const modules=result.outputFiles.map(output=>{const module={exports:{} as any};vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:uiRequire(id,require),console,Intl,Date});return module.exports;});
   const base:Item={path:'notes/A.md',title:'作業A',kind:'task',status:'todo',targetDate:'2026-11-08',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
   const rows=[base,{...base,path:'notes/B.md',status:'on_going'}, {...base,path:'notes/C.md',status:'done',completedAt:dateTime('2026-11-08T10:00:00')}, {...base,path:'notes/H.md',status:'on_hold'}, {...base,path:'notes/X.md',status:'cancelled'}, {...base,path:'notes/Old.md',targetDate:'2026-11-07'}, {...base,path:'notes/Event.md',kind:'event'}] as Item[];
   const store={subscribe:()=>()=>{},snapshot:()=>1,items:()=>rows};
@@ -75,9 +76,9 @@ test('kanban always renders, hides hold/cancelled columns, and preserves task sc
 });
 
 test('kanban exposes play/stop and only completed work has an HH:mm duration',async()=>{
-  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const module={exports:{} as any},require=createRequire(path.join(process.cwd(),'package.json'));
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{}}:require(id),console,Intl,Date});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{}}:uiRequire(id,require),console,Intl,Date});
   const base:Item={path:'notes/T.md',title:'開始前',kind:'task',status:'todo',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'研究',archived:false};
   const items=[base,{...base,path:'notes/R.md',title:'実行中',status:'on_going',taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:null}, {...base,path:'notes/D.md',title:'作業済み',status:'done',taskStart:dateTime('2026-11-09T09:00:00'),taskEnd:dateTime('2026-11-09T10:25:59')}];
   const html=renderToStaticMarkup(React.createElement(module.exports.Kanban,{items,store:{},onSelect:()=>{}}));
@@ -103,9 +104,9 @@ test('kanban exposes play/stop and only completed work has an HH:mm duration',as
 });
 
 test('parent card shows only direct children while child cards stay in their own status columns',async()=>{
-  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const module={exports:{} as any},require=createRequire(path.join(process.cwd(),'package.json'));
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{}}:require(id),console,Intl,Date});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{}}:uiRequire(id,require),console,Intl,Date});
   const base:Item={path:'notes/P.md',title:'親タスク',kind:'task',status:'todo',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
   const child={...base,path:'notes/C.md',title:'進行中の子',status:'on_going',parentTaskPath:base.path};
   const hidden={...base,path:'notes/H.md',title:'範囲外の子',status:'done',parentTaskPath:base.path};
@@ -118,10 +119,10 @@ test('parent card shows only direct children while child cards stay in their own
 });
 
 test('phone board stacks status columns while iPad and desktop keep the horizontal layout',async()=>{
-  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const module={exports:{} as any},require=createRequire(path.join(process.cwd(),'package.json'));
   const Platform={isPhone:true,isTablet:false};
-  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Platform}:require(id),console,Intl,Date});
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Platform}:uiRequire(id,require),console,Intl,Date});
   const render=()=>renderToStaticMarkup(React.createElement(module.exports.Kanban,{items:[],store:{},onSelect:()=>{}}));
   assert.ok(render().includes('class="daylight-kanban daylight-kanban-phone"'));
   Platform.isPhone=false;Platform.isTablet=true;assert.ok(!render().includes('daylight-kanban-phone'));
@@ -129,21 +130,22 @@ test('phone board stacks status columns while iPad and desktop keep the horizont
 });
 
 test('each status column provides an add action and the composer uses its initial status',async()=>{
-  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx'),path.resolve('src/CreateModal.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result=await build({entryPoints:[path.resolve('src/Kanban.tsx'),path.resolve('src/CreateModal.tsx')],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const require=createRequire(path.join(process.cwd(),'package.json'));
-  const modules=result.outputFiles.map(out=>{const module={exports:{} as any};vm.runInNewContext(out.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),console,Intl,Date});return module.exports;});
+  const modules=result.outputFiles.map(out=>{const module={exports:{} as any};vm.runInNewContext(out.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:uiRequire(id,require),console,Intl,Date});return module.exports;});
   const html=renderToStaticMarkup(React.createElement(modules[0].Kanban,{items:[],store:{},onSelect:()=>{},onAddTask:()=>{}}));
   for(const label of ['未着手','進行中','完了'])assert.ok(html.includes(`aria-label="${label}にタスクを追加"`));
   for(const initialStatus of ['todo','on_going','done','on_hold','cancelled']) {
     const form=renderToStaticMarkup(React.createElement(modules[1].CreateForm,{store:{items:()=>[]},kind:'task',day:'2026-11-09',initialStatus,close:()=>{}}));
-    assert.ok(form.includes(`value="${initialStatus}" selected=""`));assert.ok(form.includes('value="2026-11-09"'));
+    const option = form.match(/<option\b[^>]*>/g)?.find(tag => tag.includes(`value="${initialStatus}"`));
+    assert.match(option ?? '', /\bselected(?:=""|(?=[\s>]))/);assert.ok(form.includes('value="2026-11-09"'));
   }
 });
 
 test('Daylight renders a stable loading screen until store startup readiness completes', async () => {
-  const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result = await build({entryPoints:[path.resolve('src/Daylight.tsx')], bundle:true, write:false, format:'cjs', platform:'node', external:['./i18n','obsidian','preact','preact/*']});
   const module = { exports: {} as any }, require = createRequire(path.join(process.cwd(), 'package.json'));
-  vm.runInNewContext(result.outputFiles[0].text, { module, exports: module.exports, require: (id: string) => id === './i18n' ? i18n : id === 'obsidian' ? { Notice: class {}, Modal: class {} } : require(id), console, Intl, Date });
+  vm.runInNewContext(result.outputFiles[0].text, { module, exports: module.exports, require: (id: string) => id === './i18n' ? i18n : id === 'obsidian' ? { Notice: class {}, Modal: class {} } : uiRequire(id, require), console, Intl, Date });
   let ready = false;
   const store = { subscribe: () => () => {}, snapshot: () => 1, language: 'ja', isReady: () => ready, items: (): Item[] => { throw new Error('items should not be read before ready'); } };
   const loadingHtml = renderToStaticMarkup(React.createElement(module.exports.Daylight, { store, initialDate: '2026-11-06' }));
@@ -161,11 +163,11 @@ test('Daylight renders a stable loading screen until store startup readiness com
 });
 
 test('English dashboard and composers translate fixed labels and Japanese can be restored', async () => {
-  const result = await build({entryPoints:['src/Daylight.tsx','src/CreateModal.tsx','src/EventModal.tsx','src/DeleteNoteModal.tsx'],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','react','react/*','react-dom/*']});
+  const result = await build({entryPoints:['src/Daylight.tsx','src/CreateModal.tsx','src/EventModal.tsx','src/DeleteNoteModal.tsx'],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const require = createRequire(path.join(process.cwd(),'package.json'));
   const modules = result.outputFiles.map(output => {
     const module = {exports:{} as any};
-    vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:require(id),Intl,Date,console});
+    vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:uiRequire(id,require),Intl,Date,console});
     return module.exports;
   });
   const get = (name:string) => modules.find(module=>module[name])[name];
@@ -179,25 +181,25 @@ test('English dashboard and composers translate fixed labels and Japanese can be
       React.createElement(get('EventForm'),{store,seed:{title:'',start:'',end:'',status:'todo',projectPath:'',memo:''},close:()=>{}}),
       React.createElement(get('DeleteNoteForm'),{store,item:row,snapshot:{path:row.path,kind:'task',content:''},close:()=>{},onDeleted:()=>{}}),
     ];
-    for(const node of nodes) assert.doesNotMatch(renderToStaticMarkup(node), /[ぁ-んァ-ン一-龯]/);
-    const html = renderToStaticMarkup(nodes[0]);
+    for(const node of nodes) assert.doesNotMatch(renderToStaticMarkup<any>(node), /[ぁ-んァ-ン一-龯]/);
+    const html = renderToStaticMarkup<any>(nodes[0]);
     assert.ok(html.includes('Timeline'));
     assert.ok(html.includes(i18n.t('未着手')));
     for (const language of ['zh-CN', 'ko', 'zh-TW', 'es', 'de', 'fr', 'pt-BR'] as const) {
       store.language = language;
       i18n.setLanguage(language);
       for (const node of nodes) {
-        const translated = renderToStaticMarkup(node);
+        const translated = renderToStaticMarkup<any>(node);
         assert.ok(translated.length > 0);
         assert.doesNotMatch(translated, /[ぁ-んァ-ン]/, language);
       }
-      const translated = renderToStaticMarkup(nodes[0]);
+      const translated = renderToStaticMarkup<any>(nodes[0]);
       const expected = { 'zh-CN':['时间线','未开始','回收站'], ko:['타임라인','시작 전','휴지통'], 'zh-TW':['時間軸','尚未開始','垃圾桶'], es:['Cronología','Pendiente','papelera'], de:['Zeitleiste','Offen','Papierkorb'], fr:['Chronologie','À faire','corbeille'], 'pt-BR':['Linha do tempo','A fazer','lixeira'] }[language];
       assert.ok(translated.includes(expected[0]), language);
       assert.ok(translated.includes(expected[1]), language);
-      assert.ok(renderToStaticMarkup(nodes[4]).includes(expected[2]), language);
+      assert.ok(renderToStaticMarkup<any>(nodes[4]).includes(expected[2]), language);
     }
     i18n.setLanguage('ja');
-    assert.ok(renderToStaticMarkup(nodes[1]).includes('予定日（空欄で未定）'));
+    assert.ok(renderToStaticMarkup<any>(nodes[1]).includes('予定日（空欄で未定）'));
   } finally { i18n.setLanguage('ja'); }
 });

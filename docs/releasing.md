@@ -5,14 +5,15 @@ The repository contains the source, lockfile, documentation, and license notices
 ## Prepare a release
 
 1. Start from the source commit intended for release, with no unrelated local edits.
-2. Update `package.json`, the package-lock root versions, and `manifest.json` to the same `x.y.z` version. Add its minimum supported Obsidian version to `versions.json` and document changes in `CHANGELOG.md`.
+2. Update `package.json`, the package-lock root versions, and `manifest.json` to the same `x.y.z` version. Add its minimum supported Obsidian version to `versions.json` and document changes in `CHANGELOG.md`. Write the release body in `docs/releases/<version>.md`.
 3. Run `npm ci` with Node.js 22.13 or later, then `npm run release:prepare`.
 4. Confirm official ESLint checks, TypeScript, tests, the browser build, and release checks pass. Inspect the plugin in Obsidian after a fresh install and an upgrade.
 5. Commit and push the source. Confirm the GitHub Actions validation job passes on that commit.
-6. Create a GitHub Release with the exact tag from `manifest.json`, for example `0.4.2` (no `v` prefix), on that commit. Attach `dist/<version>/main.js`, `manifest.json`, `styles.css`, and `SHA256SUMS`.
-7. Download the published assets and verify their SHA-256 checksums against the prepared files.
+6. Push a new tag matching the manifest version, for example `git tag 0.4.3 && git push origin 0.4.3`. Do not move an already reviewed release tag to a different commit.
+7. The **Release plugin** workflow validates the tag, installs from the lockfile, runs the checks, builds and signs provenance attestations, then creates the GitHub Release with exactly `main.js`, `manifest.json`, and `styles.css`.
+8. Download the published files, compare them with the CI artifacts, and verify their attestations with `gh attestation verify <file> --repo Gonsix/daylight`. Checksums are retained locally in `dist/SHA256SUMS`, not attached as unsupported release assets.
 
-The build embeds the complete React, React DOM, and Scheduler MIT notices in `main.js`. The release validator rejects unexpected external dependencies, missing license notices, empty assets, and inconsistent version metadata.
+The build embeds the complete Preact MIT notice in `main.js`. The release validator rejects unexpected external dependencies, missing license notices, empty assets, and inconsistent version metadata, runtime script creation, dynamic evaluation, `!important`, and `clip-path`.
 
 ## Verification scope
 

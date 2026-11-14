@@ -1,6 +1,7 @@
+import { reviewReleasePolicy } from './release-policy.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const json = async name => JSON.parse(await readFile(name, 'utf8'));
@@ -27,14 +28,17 @@ const bundled = new Set(Object.keys(metadata.inputs).flatMap(input => {
   const match = input.match(/(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)\//);
   return match ? [match[1]] : [];
 }));
-assert.deepEqual([...bundled].sort(), ['react', 'react-dom', 'scheduler']);
+assert.deepEqual([...bundled].sort(), ['preact']);
 const bundle = await readFile('main.js', 'utf8');
 for (const name of bundled) {
   const license = (await readFile(`node_modules/${name}/LICENSE`, 'utf8')).trim();
   assert.ok(bundle.includes(license), `Missing bundled license for ${name}`);
 }
 assert.ok(bundle.includes('daylight-sunrise'));
+assert.deepEqual(reviewReleasePolicy(bundle, await readFile('styles.css', 'utf8')), [], 'Release policy violations');
+assert.ok((await readFile(`docs/releases/${version}.md`, 'utf8')).trim());
 const output = path.join('dist', version);
+await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 let sums = '';
 for (const name of ['main.js', 'manifest.json', 'styles.css']) {
@@ -43,6 +47,6 @@ for (const name of ['main.js', 'manifest.json', 'styles.css']) {
   await copyFile(name, path.join(output, name));
   sums += `${createHash('sha256').update(bytes).digest('hex')}  ${name}\n`;
 }
-await writeFile(path.join(output, 'SHA256SUMS'), sums);
-for (const name of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) await copyFile(name, path.join(output, name));
-console.log(`Validated release ${version}; assets and checksums: ${output}`);
+// Checksums stay local; Obsidian release assets contain only supported files.
+await writeFile('dist/SHA256SUMS', sums);
+console.log(`Validated release ${version}; supported assets: ${output}; local checksums: dist/SHA256SUMS`);

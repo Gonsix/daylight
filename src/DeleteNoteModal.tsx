@@ -1,6 +1,7 @@
 import { subscribeLanguage, t, useLanguage } from './i18n';
-import React, { useRef, useState } from 'react';
-import { createRoot, Root } from 'react-dom/client';
+import React, { useRef, useState } from 'preact/compat';
+import { createRoot } from 'preact/compat/client';
+type Root = ReturnType<typeof createRoot>;
 import { Modal, Notice } from 'obsidian';
 import { DaylightStore, DeleteSnapshot } from './store';
 import { Item } from './model';

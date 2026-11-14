@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'preact/compat';
 import en from './locales/en.json';
 import ja from './locales/ja.json';
 import zhCN from './locales/zh-CN.json';
@@ -45,7 +45,7 @@ export function subscribeLanguage(listener: () => void): () => void {
   return () => { listeners.delete(listener); };
 }
 export function useLanguage(): Language {
-  return useSyncExternalStore(subscribeLanguage, getLanguage, getLanguage);
+  return useSyncExternalStore(subscribeLanguage, getLanguage);
 }
 export function t(key: MessageKey, ...values: (string | number)[]): string {
   return messages[currentLanguage][key].replace(/\{(\d+)\}/g, (_, index: string) => String(values[Number(index)] ?? ''));

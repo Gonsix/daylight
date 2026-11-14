@@ -179,4 +179,4 @@ Found a problem or have an idea? [Open an issue](https://github.com/Gonsix/dayli
 
 Copyright © 2026 Gonsix. Daylight is released under the [MIT License](LICENSE).
 
-React, React DOM, and Scheduler are bundled under the MIT license; see [third-party notices](THIRD_PARTY_NOTICES.md). Obsidian branding retains its own terms. Daylight is an independent community project and is not affiliated with or endorsed by Obsidian.
+Preact is bundled under the MIT license; see [third-party notices](THIRD_PARTY_NOTICES.md). Obsidian branding retains its own terms. Daylight is an independent community project and is not affiliated with or endorsed by Obsidian.

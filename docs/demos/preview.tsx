@@ -1,5 +1,5 @@
-import React from 'react';
-import {createRoot} from 'react-dom/client';
+import React from 'preact/compat';
+import {createRoot} from 'preact/compat/client';
 import {Daylight} from '../../src/Daylight';
 import {setLanguage} from '../../src/i18n';
 import {dayKey,dateTime,itemSessions,Item} from '../../src/model';

@@ -1,5 +1,6 @@
+import type { TargetedPointerEvent } from 'preact';
 import { t, useLanguage } from './i18n';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'preact/compat';
 import { adjustRange, RangeAction, rangeDateTimes, selectRange, TIME_STEP, TimeRange } from './event';
 import { dayStart, timeLabel } from './model';
 import { confirmRangeOnEnter } from './shortcuts';
@@ -46,7 +47,7 @@ export function TimeSelection({ day, scroller, onConfirm, children }: {
     if (delta) { scroll.scrollTop += delta; applyPointer(drag.clientY); }
     frame.current = layer.current.ownerDocument.defaultView!.requestAnimationFrame(autoScroll);
   };
-  const begin = (e: React.PointerEvent, action: RangeAction) => {
+  const begin = (e: TargetedPointerEvent<HTMLElement>, action: RangeAction) => {
     if (e.button !== 0 || !e.isPrimary || !layer.current) return;
     e.preventDefault(); e.stopPropagation();
     const anchor = minute(e.clientY), original = current.current ?? selectRange(anchor, anchor);

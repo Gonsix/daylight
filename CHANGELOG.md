@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+- Replace the React DOM renderer with Preact's documented compatibility layer, removing unused runtime script-resource loaders from the distributed bundle.
+- Preserve native input, IME, modal, timeline, and Kanban behavior with the new renderer.
+- Replace four `!important` declarations with plugin-scoped selectors, and use an offscreen live-region style instead of `clip-path`.
+- Check built JavaScript and CSS against the reported review findings before packaging.
+- Generate GitHub build-provenance attestations and publish only the three Obsidian-supported assets from a validated tag workflow.
+
 ## 0.4.2
 
 - Adopt the orange sunrise icon in the view tab, ribbon, and README titles.

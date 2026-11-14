@@ -1,16 +1,14 @@
 # Third-party notices
 
-Daylight bundles the following packages from the React project:
+Daylight bundles Preact 10.29.8, including its compatibility layer, hooks, and JSX runtime.
 
-- react 19.3.1 — https://github.com/facebook/react
-- react-dom 19.3.1 — https://github.com/facebook/react
-- scheduler 0.28.0 — https://github.com/facebook/react
+Source: https://github.com/preactjs/preact
 
-All three packages use the following MIT license. Their complete notice is also embedded in the distributed main.js.
+The complete notice below is also embedded in the distributed main.js.
 
-MIT License
+The MIT License (MIT)
 
-Copyright (c) Meta Platforms, Inc. and affiliates.
+Copyright (c) 2015-present Jason Miller
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
