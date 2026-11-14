@@ -33,6 +33,8 @@ The three demos below use the English UI and fictional data in an isolated brows
 
 ![Create an event through the timeline UI: enter a title, set its time and project, then see it on the timeline.](docs/videos/events.en.gif)
 
+<sub><em>The demos are operated using Computer Use; the interface responds more quickly during normal use.</em></sub>
+
 See meetings and scheduled work together, with a current-time line to find your place in the day. Overlapping events share the timeline, and work that crosses midnight appears on the days it belongs to.
 
 Drag an empty area to select a time range, adjust its handles, and add an event. Selection uses 30-minute steps; the event form lets you set times to the minute. Click an existing event to edit it.
@@ -40,6 +42,8 @@ Drag an empty area to select a time range, adjust its handles, and add an event.
 ### Keep tasks moving
 
 ![Create a task, start it with play, drag another card into progress, pause and resume, then finish with two sessions totaling 45 minutes.](docs/videos/tasks.en.gif)
+
+<sub><em>The demos are operated using Computer Use; the interface responds more quickly during normal use.</em></sub>
 
 The Kanban board shows **Todo**, **On going**, and **Done**, with **On hold** and **Cancelled** available when you need them.
 
@@ -58,6 +62,8 @@ Actual work appears alongside the original schedule. Review your sessions and to
 ### Bring projects and notes together
 
 ![Nine tasks from three projects; selecting each project filters the board, and clearing the filter restores all nine.](docs/videos/projects.en.gif)
+
+<sub><em>The demos are operated using Computer Use; the interface responds more quickly during normal use.</em></sub>
 
 Create projects, set goals, and connect tasks and events to them. Select a project to focus the dashboard on its work. Parent tasks show their direct subtasks and completion counts.
 
