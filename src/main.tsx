@@ -123,7 +123,7 @@ export default class DaylightPlugin extends Plugin {
       if (!existing) await leaf.setViewState({ type: VIEW_TYPE, active: true });
       await this.app.workspace.revealLeaf(leaf);
     };
-    this.addRibbonIcon('calendar-clock', 'Daylight', () => void open());
+    this.addRibbonIcon(DAYLIGHT_ICON, 'Daylight', () => void open());
     this.openCommand = { id: 'open-daylight', name: t("Daylightを開く"), callback: () => void open() };
     this.addCommand(this.openCommand);
     let active = true;

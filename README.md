@@ -1,6 +1,6 @@
 <div align="center">
 
-# Daylight
+<h1><img src="docs/images/daylight.svg" width="40" height="40" align="texttop" alt="" /> Daylight</h1>
 
 **Plan your day. Move your work forward. Keep it in Obsidian.**
 
@@ -85,7 +85,7 @@ For the current source version or local development, see [Build from source](#bu
 
 ## Your first day with Daylight
 
-1. **Open your dashboard.** Use the calendar-clock ribbon icon or run **Daylight: Open Daylight** from the command palette.
+1. **Open your dashboard.** Use the sunrise ribbon icon or run **Daylight: Open Daylight** from the command palette.
 2. **Add something to do.** Use **＋** in the task section. Choose a date, project, and optional scheduled time or deadline.
 3. **Make room for it.** Select a range on the timeline to add an event.
 4. **Work and review.** Start a task, pause for a break, and finish it when done. Check the work sessions and your completed cards.

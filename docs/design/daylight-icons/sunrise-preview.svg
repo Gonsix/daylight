@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="960" viewBox="0 0 960 960">
+<rect width="960" height="960" fill="#F5F1E9"/>
+<g font-family="Hiragino Sans, Arial, sans-serif" fill="#292D32">
+<text x="56" y="89" font-size="40" font-weight="600">Daylight</text>
+<text x="58" y="128" font-size="18" fill="#70716E">日の出 — 光の線を左右対称に、同じ長さで。</text>
+<circle cx="776" cy="78" r="8" fill="#F5A544"/>
+<text x="796" y="84" font-size="16" fill="#70716E">#F5A544</text>
+<rect x="56" y="180" width="416" height="424" rx="20" fill="#292D32"/>
+<rect x="488" y="180" width="416" height="424" rx="20" fill="#FFFCF6" stroke="#E4DDD2"/>
+<g transform="translate(168 290) scale(6.0)"><g fill="none" stroke="#F5A544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 22a7 7 0 0 1 14 0"/>
+  <path d="M4 22h24M11 27h10"/>
+  <path d="M5.608 16.000 L3.010 14.500"/>
+  <path d="M10.000 11.608 L8.500 9.010"/>
+  <path d="M16.000 10.000 L16.000 7.000"/>
+  <path d="M22.000 11.608 L23.500 9.010"/>
+  <path d="M26.392 16.000 L28.990 14.500"/>
+</g></g><g transform="translate(600 290) scale(6.0)"><g fill="none" stroke="#F5A544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 22a7 7 0 0 1 14 0"/>
+  <path d="M4 22h24M11 27h10"/>
+  <path d="M5.608 16.000 L3.010 14.500"/>
+  <path d="M10.000 11.608 L8.500 9.010"/>
+  <path d="M16.000 10.000 L16.000 7.000"/>
+  <path d="M22.000 11.608 L23.500 9.010"/>
+  <path d="M26.392 16.000 L28.990 14.500"/>
+</g></g><rect x="56" y="636" width="848" height="208" rx="20" fill="#EAE6DE"/><g transform="translate(160.0 688.0) scale(0.5)"><g fill="none" stroke="#F5A544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 22a7 7 0 0 1 14 0"/>
+  <path d="M4 22h24M11 27h10"/>
+  <path d="M5.608 16.000 L3.010 14.500"/>
+  <path d="M10.000 11.608 L8.500 9.010"/>
+  <path d="M16.000 10.000 L16.000 7.000"/>
+  <path d="M22.000 11.608 L23.500 9.010"/>
+  <path d="M26.392 16.000 L28.990 14.500"/>
+</g></g><text x="168" y="786" text-anchor="middle" font-size="15" fill="#70716E">16 px</text><g transform="translate(366.0 686.0) scale(0.625)"><g fill="none" stroke="#F5A544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 22a7 7 0 0 1 14 0"/>
+  <path d="M4 22h24M11 27h10"/>
+  <path d="M5.608 16.000 L3.010 14.500"/>
+  <path d="M10.000 11.608 L8.500 9.010"/>
+  <path d="M16.000 10.000 L16.000 7.000"/>
+  <path d="M22.000 11.608 L23.500 9.010"/>
+  <path d="M26.392 16.000 L28.990 14.500"/>
+</g></g><text x="376" y="786" text-anchor="middle" font-size="15" fill="#70716E">20 px</text><g transform="translate(572.0 684.0) scale(0.75)"><g fill="none" stroke="#F5A544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 22a7 7 0 0 1 14 0"/>
+  <path d="M4 22h24M11 27h10"/>
+  <path d="M5.608 16.000 L3.010 14.500"/>
+  <path d="M10.000 11.608 L8.500 9.010"/>
+  <path d="M16.000 10.000 L16.000 7.000"/>
+  <path d="M22.000 11.608 L23.500 9.010"/>
+  <path d="M26.392 16.000 L28.990 14.500"/>
+</g></g><text x="584" y="786" text-anchor="middle" font-size="15" fill="#70716E">24 px</text><g transform="translate(776.0 680.0) scale(1.0)"><g fill="none" stroke="#F5A544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 22a7 7 0 0 1 14 0"/>
+  <path d="M4 22h24M11 27h10"/>
+  <path d="M5.608 16.000 L3.010 14.500"/>
+  <path d="M10.000 11.608 L8.500 9.010"/>
+  <path d="M16.000 10.000 L16.000 7.000"/>
+  <path d="M22.000 11.608 L23.500 9.010"/>
+  <path d="M26.392 16.000 L28.990 14.500"/>
+</g></g><text x="792" y="786" text-anchor="middle" font-size="15" fill="#70716E">32 px</text><text x="56" y="906" font-size="16" fill="#70716E">5本の光線 / 30°間隔 / 線の長さ・太さを統一 / 透明背景SVG</text>
+</g></svg>
