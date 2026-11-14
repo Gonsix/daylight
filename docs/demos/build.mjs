@@ -1,0 +1,12 @@
+import {build} from 'esbuild';
+import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+const out=process.argv[2]??'/private/tmp/daylight-demo';
+await mkdir(out,{recursive:true});
+await build({entryPoints:[path.join(root,'docs/demos/preview.tsx')],outfile:path.join(out,'app.js'),bundle:true,define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'demo-host',setup(build){build.onResolve({filter:/^obsidian$/},()=>({path:path.join(root,'docs/demos/obsidian.ts')}));}}]});
+await copyFile(path.join(root,'styles.css'),path.join(out,'styles.css'));
+await copyFile(path.join(root,'docs/demos/preview.css'),path.join(out,'preview.css'));
+await writeFile(path.join(out,'index.html'),await readFile(path.join(root,'docs/demos/index.html')));
+console.log(`Demo preview built at ${out}`);
