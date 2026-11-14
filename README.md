@@ -2,9 +2,9 @@
 
 <h1><img src="docs/images/daylight.svg" width="40" height="40" align="texttop" alt="" /> Daylight</h1>
 
-**Plan your day. Move your work forward. Keep it in Obsidian.**
+Daylight brings a daily timeline, Kanban tasks, projects, and work-session tracking into one Obsidian view.
 
-A daily timeline, a Kanban board, and your projects — together in one view.
+Everything is saved as ordinary Markdown notes in your vault.
 
 **English** · [日本語](README.ja.md)
 

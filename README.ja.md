@@ -2,9 +2,9 @@
 
 <h1><img src="docs/images/daylight.svg" width="40" height="40" align="texttop" alt="" /> Daylight</h1>
 
-**一日の予定とタスクを、Obsidianのひとつの画面に。**
+Daylightは、一日のタイムライン、カンバン形式のタスク、プロジェクト、作業セッションの記録を、Obsidianのひとつのビューにまとめます。
 
-タイムライン、カンバン、プロジェクトを行き来せずに、計画から実行まで。
+全てはノートとして通常のマークダウンで保存されます。
 
 [English](README.md) · **日本語**
 
