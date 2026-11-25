@@ -177,11 +177,15 @@ test('TaskProperties places project directly under status and renders structured
       task_sessions:['2026-11-09T09:00:00..2026-11-09T09:30:00','2026-11-09T13:30:00..'],
     }},
   }));
+  const titleIdx = multiHtml.indexOf('aria-label="タイトル"');
   const statusIdx = multiHtml.indexOf('aria-label="状態"');
   const projectIdx = multiHtml.indexOf('aria-label="プロジェクト"');
   const completedIdx = multiHtml.indexOf('aria-label="完了日時"');
   const targetDateIdx = multiHtml.indexOf('aria-label="予定日"');
-  assert.ok(statusIdx >= 0 && projectIdx > statusIdx && projectIdx < completedIdx && completedIdx < targetDateIdx);
+  assert.ok(titleIdx >= 0 && titleIdx < statusIdx && projectIdx > statusIdx && projectIdx < completedIdx && completedIdx < targetDateIdx);
+  assert.ok(multiHtml.includes('aria-label="タイトル"'));
+  assert.ok(multiHtml.includes('value="タスク"'));
+  assert.ok(multiHtml.includes('maxlength="120"'));
 
   for (const text of [
     'daylight-sessions-field',
@@ -235,6 +239,7 @@ test('English dashboard and composers translate fixed labels and Japanese can be
     assert.ok(html.includes('Timeline'));
     assert.ok(html.includes(i18n.t('未着手')));
     assert.ok(renderToStaticMarkup<any>(nodes[5]).includes('Add session'));
+    assert.ok(renderToStaticMarkup<any>(nodes[5]).includes('Title'));
     for (const language of ['zh-CN', 'ko', 'zh-TW', 'es', 'de', 'fr', 'pt-BR'] as const) {
       store.language = language;
       i18n.setLanguage(language);

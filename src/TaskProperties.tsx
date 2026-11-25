@@ -6,6 +6,7 @@ import { DaylightStore } from './store';
 import { dateTime, dateValue, formatDuration, isStatus, Item, STATUS } from './model';
 import { localDateTime, PROPERTY_LABELS, PropertyChanges, propertyType, serializeSessionDrafts, SessionDraft, sessionDraftDuration, sessionDraftsFromProperties, TASK_FIELDS, TaskSnapshot } from './task';
 import { submitOnCommandEnter } from './shortcuts';
+import { validateTitle } from './create';
 
 type SessionRow = SessionDraft & { id: number };
 
@@ -14,13 +15,14 @@ export function TaskProperties({ item, store, revision, onSaved, actions, initia
   const nextRowId=useRef(1);
   const buildRows=(data:TaskSnapshot|null):SessionRow[]=>data?sessionDraftsFromProperties(data.properties).map(s=>({...s,id:nextRowId.current++})):[];
   const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(initialSnapshot??null),[changes,setChanges]=useState<PropertyChanges>({});
+  const [title,setTitle]=useState(initialSnapshot?.title??item.title);
   const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[newType,setNewType]=useState('text');
   const [sessionRows,setSessionRows]=useState<SessionRow[]>(()=>buildRows(initialSnapshot??null));
   const [sessionsDirty,setSessionsDirty]=useState(false);
   const dirty=useRef(false),saving=useRef(false),mounted=useRef(true);
   useEffect(()=>()=>{mounted.current=false;},[]);
-  const install=(data:TaskSnapshot)=>{setSnapshot(data);setChanges({});setTypes({});setSessionRows(buildRows(data));setSessionsDirty(false);dirty.current=false;setError('');};
+  const install=(data:TaskSnapshot)=>{setSnapshot(data);setTitle(data.title??item.title);setChanges({});setTypes({});setSessionRows(buildRows(data));setSessionsDirty(false);dirty.current=false;setError('');};
   useEffect(()=>{
     if(dirty.current||saving.current)return;
     let cancelled=false;
@@ -53,6 +55,8 @@ export function TaskProperties({ item, store, revision, onSaved, actions, initia
   };
   if(!snapshot)return <div className="daylight-task-properties"><p className={error?'daylight-error':'daylight-property-loading'}>{error||t("読み込み中…")}</p></div>;
   const keys=Array.from(new Set([...TASK_FIELDS,...Object.keys(snapshot.properties),...Object.keys(changes)]));
+  const originalTitle=snapshot.title??item.title;
+  const titleChanged=title.trim()!==originalTitle;
   const value=(key:string)=>Object.hasOwn(changes,key)?changes[key]:snapshot.properties[key]??null;
   const type=(key:string)=>propertyType(key,snapshot.properties[key],types[key]||snapshot.types[key]);
   const links=store.items();
@@ -146,6 +150,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions, initia
       }
     }
     try {
+      if(titleChanged)validateTitle(title);
       for(const key of Object.keys(patch)) {
         const kind=type(key),raw=patch[key];
         if(kind==='number'&&typeof raw==='string') {if(raw.trim()==='')patch[key]=null;else {const n=Number(raw);if(!Number.isFinite(n))throw new Error(t("{0}は数値を入力してください。", PROPERTY_LABELS[key]||key));patch[key]=n;}}
@@ -155,14 +160,20 @@ export function TaskProperties({ item, store, revision, onSaved, actions, initia
     } catch(e){setError((e as Error).message);return;}
     saving.current=true;setBusy(true);setError('');let saved=false;
     try {
-      const file=await store.updateTask(snapshot,patch);saved=true;
+      const file=await store.updateTask(snapshot,patch,titleChanged?title:undefined);saved=true;
+      onSaved(file.path);
       const refreshed=await store.loadTask(file.path);
-      if(mounted.current)install(refreshed);onSaved(file.path);
+      if(mounted.current)install(refreshed);
     } catch(e){if(mounted.current)setError(saved?t("保存済みです。詳細を開き直してください。"):(e as Error).message.replaceAll(t("再読み込みしてください。"),t("詳細を開き直してください。")));}
     finally {saving.current=false;if(mounted.current)setBusy(false);}
   })(); }}>
     <div className="daylight-property-header"><h3>{t("プロパティ")}</h3></div>
     <fieldset disabled={busy} className="daylight-event-fields">
+      <label className="daylight-form-field daylight-property-field">
+        <span>{t("タイトル")}</span>
+        <input type="text" maxLength={120} aria-label={t("タイトル")} placeholder={t("タスクのタイトル")} value={title}
+          onChange={e=>{dirty.current=true;setTitle(e.currentTarget.value);setError('');}} />
+      </label>
       {TASK_FIELDS.map(field)}
       <div className="daylight-extra-properties">{keys.filter(k=>!TASK_FIELDS.includes(k)).map(field)}</div>
       {adding?<div className="daylight-new-property">
@@ -172,7 +183,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions, initia
         <button type="button" onClick={()=>setAdding(false)}>×</button>
       </div>:<button type="button" className="daylight-add-property" onClick={()=>setAdding(true)}>{t("＋ プロパティ")}</button>}
       {error&&<p className="daylight-error" role="alert">{error}</p>}
-      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||(!Object.keys(changes).length&&!sessionsDirty)}>{busy?t("保存中…"):t("保存")}</button></div>
+      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||(!Object.keys(changes).length&&!sessionsDirty&&!titleChanged)}>{busy?t("保存中…"):t("保存")}</button></div>
     </fieldset>
   </form>;
 }

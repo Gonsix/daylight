@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.7
+
+- Allow editing a task's title directly from the details sidebar with validation, non-colliding file renaming, subfolder preservation, and rollback safety on rename failure.
+
 ## 0.4.6
 
 - Make task work sessions editable afterwards from the details sidebar with structured date-time inputs, add/remove controls, live per-session and total durations, chronological ordering, legacy `task_start`/`task_end` support, and conflict protection.

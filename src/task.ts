@@ -4,7 +4,7 @@ import { dateTime, dayKey, formatDuration, isStatus, localTimestamp, parseWorkSe
 import { recordWorkStatus, serializeWorkSessions, syncWorkFields } from './execution';
 import { YamlAdapter } from './event';
 
-export interface TaskSnapshot { path: string; properties: Record<string, unknown>; types: Record<string,string>; }
+export interface TaskSnapshot { path: string; title?: string; properties: Record<string, unknown>; types: Record<string,string>; }
 export type PropertyChanges = Record<string, unknown>;
 export const TASK_FIELDS = ['status','project','completed at','target_date','schedule_start','schedule_end','task_start','task_end','task_sessions','due','parent_task'];
 export const PROPERTY_LABELS: Record<string,string> = {

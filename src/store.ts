@@ -7,7 +7,7 @@ import { EventInput, EventSnapshot, KEEP_PROJECT, eventDocument, renderEvent, up
 import { appendMemo, dateTime, dateValue, dayKey, isStatus, Item, itemSessions, Kind, notesText, parseWorkSessions, timeLabel, titleFor, WorkSession } from './model';
 import { mergeTaskProperties, PropertyChanges, TaskSnapshot, taskDocument } from './task';
 import { isFrontmatterRunning, isTaskRunning, pauseWork, recordWorkStatus } from './execution';
-import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote } from './create';
+import { TaskInput, ProjectInput, taskValues, projectValues, renderCreatedNote, validateTitle } from './create';
 import { DEFAULT_LANGUAGE, Language } from './i18n';
 
 const timerHost = window;
@@ -365,9 +365,9 @@ export class DaylightStore {
     if (!project) throw new Error(t("プロジェクトを選び直してください。"));
     return `[[${this.file(project.path).path.replace(/\.md$/, '')}]]`;
   }
-  private uniqueEventPath(stem: string, kind: Kind, currentPath = ''): string {
+  private uniqueEventPath(stem: string, kind: Kind, currentPath = '', folder = this.storage.folder(kind)): string {
     for (let suffix = 0; suffix < 10000; suffix++) {
-      const candidate = `${this.storage.folder(kind)}/${stem}${suffix ? ` ${suffix}` : ''}.md`;
+      const candidate = `${folder}/${stem}${suffix ? ` ${suffix}` : ''}.md`;
       if (candidate === currentPath || !this.app.vault.getAbstractFileByPath(candidate)) return candidate;
     }
     throw new Error(t("重複しないノート名を確保できませんでした。"));
@@ -379,7 +379,7 @@ export class DaylightStore {
       const parsed: unknown = JSON.parse(await this.app.vault.adapter.read(`${this.app.vault.configDir}/types.json`));
       if (isRecord(parsed) && isRecord(parsed.types)) types = Object.fromEntries(Object.entries(parsed.types).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
     } catch { /* Unknown types remain editable as text/YAML. */ }
-    return {path,properties:fm,types};
+    return {path,title:titleFor(file.basename,'task'),properties:fm,types};
   }
   private taskReference(value:unknown,kind:'project'|'task',source:string):string|null {
     if(value===null||value==='')return null;
@@ -423,7 +423,8 @@ export class DaylightStore {
     const snapshot=await this.loadTask(item.path);
     await this.updateTask(snapshot,{parent_task:parentPath ? `[[${parentPath.replace(/\.md$/,'')}]]` : null});
   }
-  async updateTask(snapshot:TaskSnapshot,changes:PropertyChanges):Promise<TFile> {
+  async updateTask(snapshot:TaskSnapshot,changes:PropertyChanges,nextTitle?:string):Promise<TFile> {
+    const validatedTitle=nextTitle!==undefined?validateTitle(nextTitle):undefined;
     let result:TFile|undefined;
     await this.queue('__event_mutations__',()=>this.queue(snapshot.path,async()=>{
       const file=this.file(snapshot.path),yaml={parse:parseYaml,stringify:stringifyYaml};
@@ -438,23 +439,31 @@ export class DaylightStore {
       const cachedSessions=parseWorkSessions(cachedFm?.task_sessions,cachedFm?.task_start,cachedFm?.task_end);
       const previousWorkKey=this.workKey(cachedSessions,dateTime(cachedFm?.task_start)??cachedSessions[0]?.start??null,dateTime(cachedFm?.task_end)??(cachedSessions.length?cachedSessions[cachedSessions.length-1].end:null));
       const before=await this.app.vault.read(file),preview=mergeTaskProperties(before,snapshot,patch,yaml);
-      const rename=preview.changed.includes('target_date')&&dateValue(preview.properties.target_date)!==dateValue(taskDocument(before,yaml).fm.target_date);
-      const destination=rename?this.uniqueEventPath(`${titleFor(file.basename,'task')} ${dateValue(preview.properties.target_date)||'TBD'}`,'task',file.path):file.path;
-      let previous='',updated='';
+      const currentTitle=titleFor(file.basename,'task');
+      const targetTitle=validatedTitle??currentTitle;
+      const titleChanged=targetTitle!==currentTitle;
+      const dateChanged=preview.changed.includes('target_date')&&dateValue(preview.properties.target_date)!==dateValue(taskDocument(before,yaml).fm.target_date);
+      const rename=titleChanged||dateChanged;
+      const folder=file.path.includes('/')?file.path.slice(0,file.path.lastIndexOf('/')):this.storage.folder('task');
+      const destination=rename?this.uniqueEventPath(`${targetTitle} ${dateValue(preview.properties.target_date)||'TBD'}`,'task',file.path,folder):file.path;
+      let previous='',updated='',wroteContent=false;
       let updatedWork:Record<string,unknown>|null=null;
-      await this.app.vault.process(file,latest=>{
-        previous=latest;
-        const merged=mergeTaskProperties(latest,snapshot,patch,yaml);
-        updated=merged.content;
-        if(merged.changed.some(k=>['task_sessions','task_start','task_end','status'].includes(k)))updatedWork=merged.properties;
-        return updated;
-      });
+      if(preview.changed.length>0) {
+        await this.app.vault.process(file,latest=>{
+          previous=latest;
+          const merged=mergeTaskProperties(latest,snapshot,patch,yaml);
+          updated=merged.content;
+          if(merged.changed.some(k=>['task_sessions','task_start','task_end','status'].includes(k)))updatedWork=merged.properties;
+          return updated;
+        });
+        wroteContent=true;
+      }
       try { if(destination!==file.path)await this.app.fileManager.renameFile(file,destination); }
       catch(error) {
-        if(file.path===snapshot.path) {
+        if(wroteContent&&file.path===snapshot.path) {
           try { await this.app.vault.process(file,latest=>{if(latest!==updated)throw new Error(t("別の編集があります。"));return previous;}); }
           catch {this.invalidate();throw new Error(t("内容の一部は保存済みです。ノートを開き直して確認してください。"));}
-        } else {this.invalidate();throw new Error(t("名前変更後の処理を完了できませんでした。ノートを開き直してください。"));}
+        } else if(wroteContent) {this.invalidate();throw new Error(t("名前変更後の処理を完了できませんでした。ノートを開き直してください。"));}
         this.invalidate();throw error;
       }
       this.overrides.delete(snapshot.path);this.workOverrides.delete(snapshot.path);

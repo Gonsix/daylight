@@ -585,3 +585,62 @@ test('sidebar updateTask edits, adds, and clears task_sessions including legacy 
   assert.deepEqual(fm.get(task.path).task_sessions, ['2026-11-06T10:00:00..2026-11-06T11:30:00']);
   assert.equal(row().taskEnd, new Date(2026, 10, 6, 11, 30, 0).getTime());
 });
+
+test('sidebar updateTask renames task titles, prevents collisions, keeps subfolders, validates titles, and restores on failure', async () => {
+  const { store, task, fm, bodies, app, renames } = await fixture();
+  const row = (path = task.path) => store.items().find((i: any) => i.path === path);
+
+  // Title-only rename preserves frontmatter and body
+  const beforeFm = { ...fm.get(task.path) };
+  const beforeBody = bodies.get(task.path)!;
+  const loaded = await store.loadTask(task.path);
+  assert.equal(loaded.title, 'Task');
+  await store.updateTask(loaded, {}, '  Renamed Task  ');
+  assert.equal(task.path, 'Daylight/Tasks/Renamed Task 2026-11-06.md');
+  assert.deepEqual(fm.get(task.path), beforeFm);
+  assert.equal(bodies.get(task.path), beforeBody);
+  assert.equal(row()?.title, 'Renamed Task');
+
+  // Combined title + target_date + property edit
+  await store.updateTask(await store.loadTask(task.path), { target_date: '2026-11-10', due: '2026-11-12T15:00' }, 'Updated Title');
+  assert.equal(task.path, 'Daylight/Tasks/Updated Title 2026-11-10.md');
+  assert.equal(fm.get(task.path).target_date, '2026-11-10');
+  assert.equal(fm.get(task.path).due, '2026-11-12T15:00:00');
+  assert.equal(row()?.title, 'Updated Title');
+
+  // Collision picks non-colliding suffix and keeps clean title
+  const colliding = await app.vault.create('Daylight/Tasks/Colliding 2026-11-10.md', `---\n${JSON.stringify({ tags: ['task'], status: 'todo', target_date: '2026-11-10' })}\n---\n\n## Notes\n- keep me\n`);
+  store.invalidate();
+  await store.updateTask(await store.loadTask(task.path), {}, 'Colliding');
+  assert.equal(task.path, 'Daylight/Tasks/Colliding 2026-11-10 1.md');
+  assert.equal(row()?.title, 'Colliding');
+  assert.ok(bodies.get(colliding.path)!.includes('- keep me'));
+
+  // Nested subfolder is preserved on rename
+  const nested = await app.vault.create('Daylight/Tasks/sub/Deep TBD.md', `---\n${JSON.stringify({ tags: ['task'], status: 'todo', target_date: null })}\n---\n\n## Notes\n`);
+  store.invalidate();
+  await store.updateTask(await store.loadTask(nested.path), {}, 'Deep Renamed');
+  assert.equal(nested.path, 'Daylight/Tasks/sub/Deep Renamed TBD.md');
+  assert.equal(row(nested.path)?.title, 'Deep Renamed');
+
+  // Invalid titles reject without modifying or renaming
+  const renameCount = renames.length;
+  const snap = await store.loadTask(task.path);
+  for (const bad of ['', '   ', 'bad/name', 'bad:name', 'a'.repeat(121)]) {
+    await assert.rejects(() => store.updateTask(snap, { due: '2026-11-15T09:00' }, bad));
+  }
+  assert.equal(renames.length, renameCount);
+  assert.equal(fm.get(task.path).due, '2026-11-12T15:00:00');
+
+  // Rename failure during combined title + property edit restores previous content and path
+  const prevPath = task.path;
+  const prevContent = bodies.get(task.path)!;
+  const rollbackSnap = await store.loadTask(task.path);
+  const origRename = app.fileManager.renameFile;
+  app.fileManager.renameFile = async () => { throw new Error('rename failed'); };
+  await assert.rejects(() => store.updateTask(rollbackSnap, { due: '2026-11-20T10:00' }, 'Rollback Title'), /rename failed/);
+  app.fileManager.renameFile = origRename;
+  assert.equal(task.path, prevPath);
+  assert.equal(bodies.get(task.path), prevContent);
+  assert.equal(fm.get(task.path).due, '2026-11-12T15:00:00');
+});
