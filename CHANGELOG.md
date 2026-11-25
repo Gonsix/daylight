@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.6
+
+- Make task work sessions editable afterwards from the details sidebar with structured date-time inputs, add/remove controls, live per-session and total durations, chronological ordering, legacy `task_start`/`task_end` support, and conflict protection.
+- Move the project selector directly below the status selector in the task details sidebar.
+
 ## 0.4.5
 
 - Simplify the bundled event, task, and project templates to frontmatter only, with empty bodies.
