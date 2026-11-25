@@ -2,7 +2,7 @@ import * as i18n from '../src/i18n';
 i18n.setLanguage('ja');
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeTaskProperties, propertyType, TaskSnapshot, taskDocument } from '../src/task';
+import { mergeTaskProperties, propertyType, serializeSessionDrafts, sessionDraftDuration, sessionDraftsFromProperties, TASK_FIELDS, TaskSnapshot, taskDocument } from '../src/task';
 
 const yaml={parse:JSON.parse,stringify:JSON.stringify};
 const properties={tags:['task'],status:'todo',target_date:null,schedule_start:null,schedule_end:null,due:null,project:null,parent_task:null,'created at':'2026-11-06','last updated':null,score:5,flag:true,list:['a'],config:{nested:[1,true]}};
@@ -56,4 +56,49 @@ test('actual work timestamps use datetime controls and reject reversed or missin
   assert.equal(sessions.properties.task_end,null);
   assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_sessions:['2026-11-09T10:00..2026-11-09T09:00']},yaml),/作業開始/);
   assert.throws(()=>mergeTaskProperties(content(),snapshot,{task_sessions:['2026-11-09T09:00..','2026-11-09T13:00..']},yaml),/終了日時/);
+});
+
+test('project field is placed immediately after status in task properties', () => {
+  assert.equal(TASK_FIELDS.indexOf('project'), TASK_FIELDS.indexOf('status') + 1);
+});
+
+test('session drafts parse multi-session and legacy bounds, sort chronologically, and compute duration', () => {
+  assert.deepEqual(sessionDraftsFromProperties({
+    task_sessions: ['2026-11-09T09:00:15..2026-11-09T09:30:00', '2026-11-09T13:30:00..'],
+  }), [
+    { start: '2026-11-09T09:00:15', end: '2026-11-09T09:30' },
+    { start: '2026-11-09T13:30', end: '' },
+  ]);
+  assert.deepEqual(sessionDraftsFromProperties({
+    task_start: '2026-11-09T10:00:00',
+    task_end: '2026-11-09T11:15:00',
+  }), [{ start: '2026-11-09T10:00', end: '2026-11-09T11:15' }]);
+  assert.deepEqual(serializeSessionDrafts([
+    { start: '2026-11-09T13:30', end: '' },
+    { start: '2026-11-09T08:00', end: '2026-11-09T08:45' },
+  ]), ['2026-11-09T08:00..2026-11-09T08:45', '2026-11-09T13:30..']);
+  assert.deepEqual(serializeSessionDrafts([
+    { start: 'invalid', end: '2026-11-09T08:45' },
+    { start: '2026-11-09T08:00', end: '2026-11-09T08:45' },
+  ]), ['invalid..2026-11-09T08:45', '2026-11-09T08:00..2026-11-09T08:45']);
+  assert.equal(sessionDraftDuration([
+    { start: '2026-11-09T09:00', end: '2026-11-09T09:30' },
+    { start: '2026-11-09T13:00', end: '' },
+    { start: '2026-11-09T14:00', end: '2026-11-09T13:00' },
+  ]), '00:30');
+  assert.equal(sessionDraftDuration([{ start: '2026-11-09T13:00', end: '' }]), null);
+});
+
+test('clearing sessions clears legacy task_start/task_end and rejects coupled external edits', () => {
+  const legacyProps = { ...properties, task_start: '2026-11-09T09:00:00', task_end: '2026-11-09T10:00:00' };
+  const legacySnap: TaskSnapshot = { path: snapshot.path, properties: legacyProps, types: {} };
+  const cleared = mergeTaskProperties(content(legacyProps), legacySnap, { task_sessions: null, task_start: null, task_end: null }, yaml);
+  assert.equal(cleared.properties.task_sessions, null);
+  assert.equal(cleared.properties.task_start, null);
+  assert.equal(cleared.properties.task_end, null);
+
+  const sessionProps = { ...properties, task_sessions: ['2026-11-09T09:00:00..2026-11-09T10:00:00'], task_start: '2026-11-09T09:00:00', task_end: '2026-11-09T10:00:00' };
+  const sessionSnap: TaskSnapshot = { path: snapshot.path, properties: sessionProps, types: {} };
+  const latestWithExternalStartChange = content({ ...sessionProps, task_start: '2026-11-09T08:30:00' });
+  assert.throws(() => mergeTaskProperties(latestWithExternalStartChange, sessionSnap, { task_sessions: ['2026-11-09T09:00..2026-11-09T11:00'] }, yaml), /作業開始.*更新されています/);
 });

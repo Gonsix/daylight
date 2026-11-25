@@ -162,12 +162,60 @@ test('Daylight renders a stable loading screen until store startup readiness com
   assert.ok(readyHtml.includes('タイムライン'));
 });
 
+test('TaskProperties places project directly under status and renders structured session inputs', async () => {
+  const result = await build({entryPoints:[path.resolve('src/TaskProperties.tsx')],bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
+  const module = {exports:{} as any}, require = createRequire(path.join(process.cwd(),'package.json'));
+  vm.runInNewContext(result.outputFiles[0].text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{parseYaml:JSON.parse,stringifyYaml:JSON.stringify}:uiRequire(id,require),console,Intl,Date});
+  const item:Item = {path:'notes/T.md',title:'タスク',kind:'task',status:'on_going',targetDate:'2026-11-09',start:null,end:null,due:null,projectPath:'notes/P.md',projectLabel:'研究',archived:false};
+  const projectItem:Item = {path:'notes/P.md',title:'研究',kind:'project',status:'on_going',targetDate:'',start:null,end:null,due:null,projectPath:null,projectLabel:'',archived:false};
+  const store = {items:()=>[item,projectItem],loadTask:async()=>({path:item.path,properties:{},types:{}}),updateTask:async()=>({path:item.path})};
+
+  const multiHtml = renderToStaticMarkup(React.createElement(module.exports.TaskProperties,{
+    item, store, revision:1, onSaved:()=>{},
+    initialSnapshot:{path:item.path,types:{},properties:{
+      tags:['task'], status:'on_going', project:'[[notes/P]]',
+      task_sessions:['2026-11-09T09:00:00..2026-11-09T09:30:00','2026-11-09T13:30:00..'],
+    }},
+  }));
+  const statusIdx = multiHtml.indexOf('aria-label="状態"');
+  const projectIdx = multiHtml.indexOf('aria-label="プロジェクト"');
+  const completedIdx = multiHtml.indexOf('aria-label="完了日時"');
+  const targetDateIdx = multiHtml.indexOf('aria-label="予定日"');
+  assert.ok(statusIdx >= 0 && projectIdx > statusIdx && projectIdx < completedIdx && completedIdx < targetDateIdx);
+
+  for (const text of [
+    'daylight-sessions-field',
+    'aria-label="セッション1の開始"',
+    'value="2026-11-09T09:00"',
+    'aria-label="セッション1の終了"',
+    'value="2026-11-09T09:30"',
+    'aria-label="セッション1を削除"',
+    'aria-label="セッション2の開始"',
+    'value="2026-11-09T13:30"',
+    'aria-label="セッション2の終了"',
+    '＋ セッションを追加',
+    '作業時間 00:30',
+  ]) assert.ok(multiHtml.includes(text), text);
+  assert.ok(!multiHtml.includes('aria-label="作業セッション"'));
+
+  const legacyHtml = renderToStaticMarkup(React.createElement(module.exports.TaskProperties,{
+    item, store, revision:1, onSaved:()=>{},
+    initialSnapshot:{path:item.path,types:{},properties:{
+      tags:['task'], status:'done', task_start:'2026-11-09T10:00:00', task_end:'2026-11-09T11:15:00',
+    }},
+  }));
+  assert.ok(legacyHtml.includes('aria-label="セッション1の開始"'));
+  assert.ok(legacyHtml.includes('value="2026-11-09T10:00"'));
+  assert.ok(legacyHtml.includes('value="2026-11-09T11:15"'));
+  assert.ok(legacyHtml.includes('作業時間 01:15'));
+});
+
 test('English dashboard and composers translate fixed labels and Japanese can be restored', async () => {
-  const result = await build({entryPoints:['src/Daylight.tsx','src/CreateModal.tsx','src/EventModal.tsx','src/DeleteNoteModal.tsx'],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
+  const result = await build({entryPoints:['src/Daylight.tsx','src/CreateModal.tsx','src/EventModal.tsx','src/DeleteNoteModal.tsx','src/TaskProperties.tsx'],outdir:'unused',bundle:true,write:false,format:'cjs',platform:'node',external:['./i18n','obsidian','preact','preact/*']});
   const require = createRequire(path.join(process.cwd(),'package.json'));
   const modules = result.outputFiles.map(output => {
     const module = {exports:{} as any};
-    vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{}}:uiRequire(id,require),Intl,Date,console});
+    vm.runInNewContext(output.text,{module,exports:module.exports,require:(id:string)=>id==='./i18n'?i18n:id==='obsidian'?{Notice:class{},Modal:class{},parseYaml:JSON.parse,stringifyYaml:JSON.stringify}:uiRequire(id,require),Intl,Date,console});
     return module.exports;
   });
   const get = (name:string) => modules.find(module=>module[name])[name];
@@ -180,11 +228,13 @@ test('English dashboard and composers translate fixed labels and Japanese can be
       ...(['task','project'] as const).map(kind=>React.createElement(get('CreateForm'),{store,kind,close:()=>{}})),
       React.createElement(get('EventForm'),{store,seed:{title:'',start:'',end:'',status:'todo',projectPath:'',memo:''},close:()=>{}}),
       React.createElement(get('DeleteNoteForm'),{store,item:row,snapshot:{path:row.path,kind:'task',content:''},close:()=>{},onDeleted:()=>{}}),
+      React.createElement(get('TaskProperties'),{item:row,store,revision:1,onSaved:()=>{},initialSnapshot:{path:row.path,types:{},properties:{tags:['task'],status:'on_going',task_sessions:['2026-11-13T09:00:00..2026-11-13T09:30:00']}}}),
     ];
     for(const node of nodes) assert.doesNotMatch(renderToStaticMarkup<any>(node), /[ぁ-んァ-ン一-龯]/);
     const html = renderToStaticMarkup<any>(nodes[0]);
     assert.ok(html.includes('Timeline'));
     assert.ok(html.includes(i18n.t('未着手')));
+    assert.ok(renderToStaticMarkup<any>(nodes[5]).includes('Add session'));
     for (const language of ['zh-CN', 'ko', 'zh-TW', 'es', 'de', 'fr', 'pt-BR'] as const) {
       store.language = language;
       i18n.setLanguage(language);

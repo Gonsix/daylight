@@ -253,5 +253,9 @@
   "月の選択": "Monat",
   "言語": "Sprache",
   "英語": "Englisch",
-  "{0}年": "{0}"
+  "{0}年": "{0}",
+  "＋ セッションを追加": "＋ Sitzung hinzufügen",
+  "セッション{0}を削除": "Sitzung {0} löschen",
+  "セッション{0}の開始": "Beginn von Sitzung {0}",
+  "セッション{0}の終了": "Ende von Sitzung {0}"
 }

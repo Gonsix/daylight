@@ -1,12 +1,12 @@
 import { isRecord, stringList } from './value';
 import { t } from './i18n';
-import { dateTime, dayKey, isStatus, localTimestamp, parseWorkSessions, timeLabel, validDay, WorkSession } from './model';
+import { dateTime, dayKey, formatDuration, isStatus, localTimestamp, parseWorkSessions, timeLabel, validDay, WorkSession } from './model';
 import { recordWorkStatus, serializeWorkSessions, syncWorkFields } from './execution';
 import { YamlAdapter } from './event';
 
 export interface TaskSnapshot { path: string; properties: Record<string, unknown>; types: Record<string,string>; }
 export type PropertyChanges = Record<string, unknown>;
-export const TASK_FIELDS = ['status','completed at','target_date','schedule_start','schedule_end','task_start','task_end','task_sessions','due','project','parent_task'];
+export const TASK_FIELDS = ['status','project','completed at','target_date','schedule_start','schedule_end','task_start','task_end','task_sessions','due','parent_task'];
 export const PROPERTY_LABELS: Record<string,string> = {
   get status() { return t("状態"); },get target_date() { return t("予定日"); },get schedule_start() { return t("開始"); },get schedule_end() { return t("終了"); },get due() { return t("締切"); },get project() { return t("プロジェクト"); },get parent_task() { return t("親タスク"); },
   get tags() { return t("タグ"); },get aliases() { return t("別名"); },get 'created at'() { return t("作成日"); },get 'last updated'() { return t("更新日時"); },
@@ -25,6 +25,35 @@ export function localDateTime(value: unknown): string {
   const time=dateTime(value);if(time===null)return '';
   const seconds=Math.floor(time%60000/1000);
   return `${dayKey(time)}T${timeLabel(time)}${seconds?':'+String(seconds).padStart(2,'0'):''}`;
+}
+export interface SessionDraft { start: string; end: string; }
+export function sessionDraftsFromProperties(properties: Record<string, unknown>): SessionDraft[] {
+  return parseWorkSessions(properties.task_sessions, properties.task_start, properties.task_end)
+    .map(s => ({
+      start: localDateTime(localTimestamp(s.start)),
+      end: s.end !== null ? localDateTime(localTimestamp(s.end)) : '',
+    }));
+}
+export function serializeSessionDrafts(drafts: SessionDraft[]): string[] {
+  const entries = drafts.map((d, index) => {
+    const start = d.start.trim(), end = d.end.trim();
+    return { start, end, startTime: dateTime(start), index };
+  });
+  const ordered = entries.every(e => e.startTime !== null)
+    ? [...entries].sort((a, b) => a.startTime! - b.startTime! || a.index - b.index)
+    : entries;
+  return ordered.map(e => `${e.start}..${e.end}`);
+}
+export function sessionDraftDuration(drafts: SessionDraft[]): string | null {
+  let totalMs = 0, count = 0;
+  for (const d of drafts) {
+    const start = dateTime(d.start.trim()), end = dateTime(d.end.trim());
+    if (start !== null && end !== null && end >= start) {
+      totalMs += end - start;
+      count++;
+    }
+  }
+  return count > 0 ? formatDuration(totalMs / 60000) : null;
 }
 export function propertyType(key:string,value:unknown,declared=''):string {
   if(['project','parent_task','status'].includes(key))return key;
@@ -52,6 +81,13 @@ export function mergeTaskProperties(content:string,snapshot:TaskSnapshot,changes
   for(const key of keys) {
     if(!key.trim()||/[\r\n\0]/.test(key))throw new Error(t("プロパティ名を確認してください。"));
     if(!equal(fm[key],snapshot.properties[key]))throw new Error(t("{0}が更新されています。再読み込みしてください。", PROPERTY_LABELS[key]||key));
+  }
+  if (keys.includes('task_sessions')) {
+    for (const coupled of ['task_start', 'task_end']) {
+      if (!keys.includes(coupled) && !equal(fm[coupled], snapshot.properties[coupled])) {
+        throw new Error(t("{0}が更新されています。再読み込みしてください。", PROPERTY_LABELS[coupled] || coupled));
+      }
+    }
   }
   const next: Record<string, unknown> = { ...fm };
   for (const key of keys) next[key] = changes[key];

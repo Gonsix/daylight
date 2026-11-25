@@ -247,15 +247,23 @@
 .daylight-kanban-action + .daylight-kanban-menu-button { margin-left: 0; }
 .daylight-kanban-action:hover { background: var(--daylight-raised); }
 .daylight-work-sessions-count { color: var(--daylight-muted); font-size: 11px; white-space: nowrap; }
-.daylight-work-sessions { margin: 16px 0 10px; }
-.daylight-work-sessions h3 { margin: 0 0 8px; }
-.daylight-work-sessions ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-.daylight-work-sessions li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--daylight-muted); font-variant-numeric: tabular-nums; }
-.daylight-work-sessions li small { color: var(--daylight-text); font-size: 11px; }
+.daylight-sessions-field { gap: 8px; }
+.daylight-sessions-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.daylight-sessions-head > small { color: var(--daylight-text); font-size: 11px; }
+.daylight-sessions-list { display: flex; flex-direction: column; gap: 8px; }
+.daylight-session-row { display: flex; flex-direction: column; gap: 6px; padding: 9px; border: 1px solid var(--daylight-border); border-radius: 6px; background: var(--daylight-bg); }
+.daylight-session-row-head { display: flex; align-items: center; gap: 8px; color: var(--daylight-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.daylight-session-row-head > small { color: var(--daylight-text); font-size: 11px; }
+.daylight-app .daylight-session-remove { margin-left: auto; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--daylight-muted); font-size: 14px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.daylight-app .daylight-session-remove:hover { color: var(--text-error, #e89b96); background: var(--daylight-raised); }
+.daylight-session-input { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.daylight-session-input > span { color: var(--daylight-muted); font-size: 10px; }
+.daylight-session-input input { height: 31px; padding: 4px 8px; font-size: 11px; background-color: var(--daylight-surface); }
+.daylight-app .daylight-add-session { align-self: flex-start; padding: 4px 0; margin: 0; background: transparent; border: 0; color: var(--daylight-muted); font-size: 11px; }
+.daylight-app .daylight-add-session:hover { color: var(--daylight-text); }
 .daylight-kanban-status-menu { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid var(--daylight-border); }
 .daylight-app .daylight-kanban-status-menu button { padding: 5px 7px; border: 0; border-radius: 4px; background: var(--daylight-bg); color: var(--daylight-muted); text-align: left; font-size: 11px; }
 .daylight-work-duration { font-variant-numeric: tabular-nums; }
-.daylight-detail > .daylight-work-duration { margin-bottom: 16px; color: var(--daylight-muted); font-size: 12px; }
 .daylight-slot.daylight-slot-actual { border: 1px solid var(--daylight-state); border-left-width: 3px; background: color-mix(in srgb, var(--daylight-state) 22%, var(--daylight-bg)); }
 .daylight-slot-actual.is-running { border-bottom-width: 2px; }
 

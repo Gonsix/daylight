@@ -9,12 +9,12 @@ import { TimeSelection } from './TimeSelection';
 import { openEditEventModal, openEventModal } from './EventModal';
 import { rangeDateTimes } from './event';
 import { openTaskModal, openProjectModal } from './CreateModal';
-import { isTaskRunning, workDuration } from './execution';
+import { isTaskRunning } from './execution';
 import { openDeleteNoteModal } from './DeleteNoteModal';
 import { Kanban, kanbanTasks } from './Kanban';
 import { TaskProperties } from './TaskProperties';
 import { submitOnCommandEnter } from './shortcuts';
-import { centeredScrollTop, dayKey, dayStart, formatDuration, hasSchedule, isActive, isStatus, Item, itemSessions, moveDay, STATUS, TaskTab, timeline, timelineCandidates, timeLabel } from './model';
+import { centeredScrollTop, dayKey, dayStart, hasSchedule, isActive, isStatus, Item, moveDay, STATUS, TaskTab, timeline, timelineCandidates, timeLabel } from './model';
 
 function Icon({ name, size = 16 }: { name: string; size?: number }) {
   const paths: Record<string, React.ReactNode> = {
@@ -134,14 +134,6 @@ function Details({ item, store, draft, onDraft, onSaved, onClose, revision, onRe
       {item.due !== null && <><dt>{t("締切")}</dt><dd>{dayKey(item.due)} {timeLabel(item.due)}</dd></>}
     </dl>
     </>}
-    {item.kind === 'task' && itemSessions(item).length > 0 && <div className="daylight-work-sessions">
-      <h3>{t("作業セッション")}</h3>
-      <ul>{itemSessions(item).map((s, idx) => <li key={`${s.start}-${idx}`}>
-        <span>{dayKey(s.start)} {timeLabel(s.start)} → {s.end != null ? `${dayKey(s.end) === dayKey(s.start) ? '' : `${dayKey(s.end)} `}${timeLabel(s.end)}` : '--:--'}</span>
-        {s.end != null && s.end >= s.start && <small>{formatDuration((s.end - s.start) / 60000)}</small>}
-      </li>)}</ul>
-    </div>}
-    {workDuration(item) && <p className="daylight-work-duration">{t("作業時間")}{' '}{workDuration(item)}</p>}
     <h3>{t("メモ")}</h3>
     {notes && <div className="daylight-notes">{notes}</div>}
     <form onKeyDownCapture={e=>submitOnCommandEnter(e,memoSaving.current)} onSubmit={e => { void (async () => {

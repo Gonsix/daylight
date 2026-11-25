@@ -3,18 +3,24 @@ import { t, useLanguage } from './i18n';
 import React, { useEffect, useRef, useState } from 'preact/compat';
 import { parseYaml, stringifyYaml } from 'obsidian';
 import { DaylightStore } from './store';
-import { dateValue, isStatus, Item, STATUS } from './model';
-import { localDateTime, PROPERTY_LABELS, PropertyChanges, propertyType, TASK_FIELDS, TaskSnapshot } from './task';
+import { dateTime, dateValue, formatDuration, isStatus, Item, STATUS } from './model';
+import { localDateTime, PROPERTY_LABELS, PropertyChanges, propertyType, serializeSessionDrafts, SessionDraft, sessionDraftDuration, sessionDraftsFromProperties, TASK_FIELDS, TaskSnapshot } from './task';
 import { submitOnCommandEnter } from './shortcuts';
 
-export function TaskProperties({ item, store, revision, onSaved, actions }: { item:Item; store:DaylightStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode }) {
+type SessionRow = SessionDraft & { id: number };
+
+export function TaskProperties({ item, store, revision, onSaved, actions, initialSnapshot }: { item:Item; store:DaylightStore; revision:number; onSaved:(path:string)=>void; actions?:React.ReactNode; initialSnapshot?:TaskSnapshot }) {
   useLanguage();
-  const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(null),[changes,setChanges]=useState<PropertyChanges>({});
+  const nextRowId=useRef(1);
+  const buildRows=(data:TaskSnapshot|null):SessionRow[]=>data?sessionDraftsFromProperties(data.properties).map(s=>({...s,id:nextRowId.current++})):[];
+  const [snapshot,setSnapshot]=useState<TaskSnapshot|null>(initialSnapshot??null),[changes,setChanges]=useState<PropertyChanges>({});
   const [types,setTypes]=useState<Record<string,string>>({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [adding,setAdding]=useState(false),[name,setName]=useState(''),[newType,setNewType]=useState('text');
+  const [sessionRows,setSessionRows]=useState<SessionRow[]>(()=>buildRows(initialSnapshot??null));
+  const [sessionsDirty,setSessionsDirty]=useState(false);
   const dirty=useRef(false),saving=useRef(false),mounted=useRef(true);
   useEffect(()=>()=>{mounted.current=false;},[]);
-  const install=(data:TaskSnapshot)=>{setSnapshot(data);setChanges({});setTypes({});dirty.current=false;setError('');};
+  const install=(data:TaskSnapshot)=>{setSnapshot(data);setChanges({});setTypes({});setSessionRows(buildRows(data));setSessionsDirty(false);dirty.current=false;setError('');};
   useEffect(()=>{
     if(dirty.current||saving.current)return;
     let cancelled=false;
@@ -22,14 +28,74 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     return ()=>{cancelled=true;};
   },[item.path,revision]);
   const change=(key:string,value:unknown)=>{dirty.current=true;setChanges(prev=>({...prev,[key]:value}));setError('');};
+  const mutateSessions=(updater:(rows:SessionRow[])=>SessionRow[])=>{
+    dirty.current=true;
+    setError('');
+    setSessionRows(prev=>{
+      let base=prev;
+      if(!sessionsDirty&&(Object.hasOwn(changes,'task_start')||Object.hasOwn(changes,'task_end'))) {
+        base=prev.map(r=>({...r}));
+        const hasStart=Object.hasOwn(changes,'task_start'),hasEnd=Object.hasOwn(changes,'task_end');
+        const nextStart=hasStart?valueText(changes.task_start):'',nextEnd=hasEnd?valueText(changes.task_end):'';
+        if(!base.length&&(nextStart||nextEnd))base.push({id:nextRowId.current++,start:nextStart,end:nextEnd});
+        else if(base.length) {
+          if(hasStart)base[0].start=nextStart;
+          if(hasEnd)base[base.length-1].end=nextEnd;
+        }
+      }
+      return updater(base);
+    });
+    setSessionsDirty(true);
+    setChanges(prev=>{
+      if(!Object.hasOwn(prev,'task_start')&&!Object.hasOwn(prev,'task_end'))return prev;
+      const next={...prev};delete next.task_start;delete next.task_end;return next;
+    });
+  };
   if(!snapshot)return <div className="daylight-task-properties"><p className={error?'daylight-error':'daylight-property-loading'}>{error||t("読み込み中…")}</p></div>;
   const keys=Array.from(new Set([...TASK_FIELDS,...Object.keys(snapshot.properties),...Object.keys(changes)]));
   const value=(key:string)=>Object.hasOwn(changes,key)?changes[key]:snapshot.properties[key]??null;
   const type=(key:string)=>propertyType(key,snapshot.properties[key],types[key]||snapshot.types[key]);
   const links=store.items();
+  const orderedRows=(()=>{
+    const parsed=sessionRows.map((row,idx)=>({row,idx,time:dateTime(row.start.trim())}));
+    return parsed.every(p=>p.time!==null)?[...parsed].sort((a,b)=>a.time!-b.time!||a.idx-b.idx).map(p=>p.row):sessionRows;
+  })();
   const field=(key:string)=>{
     const current=value(key),kind=type(key),label=PROPERTY_LABELS[key]||key;
     const text=valueText(current);
+    if(key==='task_sessions') {
+      const totalDuration=sessionDraftDuration(sessionRows);
+      return <div className="daylight-property-field daylight-sessions-field" key={key}>
+        <div className="daylight-sessions-head">
+          <span>{label}</span>
+          {totalDuration&&<small className="daylight-work-duration">{t("作業時間")}{' '}{totalDuration}</small>}
+        </div>
+        {sessionRows.length>0&&<div className="daylight-sessions-list">
+          {sessionRows.map((session,idx)=>{
+            const sTime=dateTime(session.start.trim()),eTime=dateTime(session.end.trim());
+            const dur=sTime!==null&&eTime!==null&&eTime>=sTime?formatDuration((eTime-sTime)/60000):null;
+            return <div className="daylight-session-row" key={session.id}>
+              <div className="daylight-session-row-head">
+                <span>#{idx+1}</span>
+                {dur&&<small className="daylight-work-duration">{dur}</small>}
+                <button type="button" className="daylight-session-remove" aria-label={t("セッション{0}を削除",idx+1)} onClick={()=>mutateSessions(rows=>rows.filter(r=>r.id!==session.id))}>×</button>
+              </div>
+              <label className="daylight-session-input">
+                <span>{t("開始")}</span>
+                <input type="datetime-local" step={session.start.length>16?1:60} aria-label={t("セッション{0}の開始",idx+1)} value={session.start}
+                  onChange={e=>{const v=e.currentTarget.value;mutateSessions(rows=>rows.map(r=>r.id===session.id?{...r,start:v}:r));}} />
+              </label>
+              <label className="daylight-session-input">
+                <span>{t("終了")}</span>
+                <input type="datetime-local" step={session.end.length>16?1:60} aria-label={t("セッション{0}の終了",idx+1)} value={session.end}
+                  onChange={e=>{const v=e.currentTarget.value;mutateSessions(rows=>rows.map(r=>r.id===session.id?{...r,end:v}:r));}} />
+              </label>
+            </div>;
+          })}
+        </div>}
+        <button type="button" className="daylight-add-session" onClick={()=>mutateSessions(rows=>[...rows,{id:nextRowId.current++,start:'',end:''}])}>{t("＋ セッションを追加")}</button>
+      </div>;
+    }
     let control:React.ReactNode;
     if(kind==='status')control=<select value={text} aria-label={label} onChange={e=>change(key,e.currentTarget.value)}>
       {!isStatus(text)&&<option value={text}>{text||t("未設定")}</option>}{Object.entries(STATUS).map(([id,s])=><option key={id} value={id}>{s.label}</option>)}</select>;
@@ -44,8 +110,22 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
     else if(kind==='list')control=<textarea rows={2} aria-label={label} placeholder={t("1行に1項目")} value={typeof current==='string'?current:Array.isArray(current)?current.join('\n'):''} onChange={e=>change(key,e.currentTarget.value)} />;
     else if(kind==='yaml')control=<textarea className="daylight-property-yaml" rows={4} aria-label={label} value={typeof current==='string'?current:stringifyYaml(current??{}).trimEnd()} onChange={e=>change(key,e.currentTarget.value)} />;
     else if(kind==='datetime') {
-      const local=localDateTime(current);
-      control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>change(key,e.currentTarget.value||null)} />;
+      if(sessionsDirty&&key==='task_start') {
+        const local=orderedRows[0]?.start??'';
+        control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>{
+          const v=e.currentTarget.value,firstId=orderedRows[0]?.id;
+          mutateSessions(rows=>firstId!==undefined?rows.map(r=>r.id===firstId?{...r,start:v}:r):v?[...rows,{id:nextRowId.current++,start:v,end:''}]:rows);
+        }} />;
+      } else if(sessionsDirty&&key==='task_end') {
+        const local=orderedRows.at(-1)?.end??'';
+        control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>{
+          const v=e.currentTarget.value,lastId=orderedRows.at(-1)?.id;
+          mutateSessions(rows=>lastId!==undefined?rows.map(r=>r.id===lastId?{...r,end:v}:r):v?[...rows,{id:nextRowId.current++,start:'',end:v}]:rows);
+        }} />;
+      } else {
+        const local=localDateTime(current);
+        control=<input type="datetime-local" step={local.length>16?1:60} aria-label={label} value={local} onChange={e=>change(key,e.currentTarget.value||null)} />;
+      }
     } else if(kind==='date')control=<input type="date" aria-label={label} value={dateValue(current)} onChange={e=>change(key,e.currentTarget.value||null)} />;
     else if(kind==='number')control=<input type="number" step="any" aria-label={label} value={text} onChange={e=>change(key,e.currentTarget.value)} />;
     else control=<input type="text" aria-label={label} value={text} onChange={e=>change(key,e.currentTarget.value)} />;
@@ -54,6 +134,17 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
   return <form className="daylight-task-properties" onKeyDownCapture={e=>submitOnCommandEnter(e,saving.current)} onSubmit={e=>{ void (async () => {
     e.preventDefault();if(saving.current)return;
     const patch:PropertyChanges={...changes};
+    if(sessionsDirty) {
+      delete patch.task_start;
+      delete patch.task_end;
+      if(!sessionRows.length) {
+        patch.task_sessions=null;
+        patch.task_start=null;
+        patch.task_end=null;
+      } else {
+        patch.task_sessions=serializeSessionDrafts(sessionRows);
+      }
+    }
     try {
       for(const key of Object.keys(patch)) {
         const kind=type(key),raw=patch[key];
@@ -81,7 +172,7 @@ export function TaskProperties({ item, store, revision, onSaved, actions }: { it
         <button type="button" onClick={()=>setAdding(false)}>×</button>
       </div>:<button type="button" className="daylight-add-property" onClick={()=>setAdding(true)}>{t("＋ プロパティ")}</button>}
       {error&&<p className="daylight-error" role="alert">{error}</p>}
-      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||!Object.keys(changes).length}>{busy?t("保存中…"):t("保存")}</button></div>
+      <div className="daylight-detail-save-actions">{actions}<button type="submit" className="daylight-save" aria-keyshortcuts="Meta+Enter" title="⌘ Enter" disabled={busy||(!Object.keys(changes).length&&!sessionsDirty)}>{busy?t("保存中…"):t("保存")}</button></div>
     </fieldset>
   </form>;
 }

@@ -434,12 +434,20 @@ export class DaylightStore {
         if(Object.hasOwn(patch,key)&&!equal(patch[key],snapshot.properties[key]))patch[key]=this.taskReference(patch[key],kind,snapshot.path);
       }
       if (Object.hasOwn(patch,'parent_task') && !equal(patch.parent_task,snapshot.properties.parent_task)) await this.validateParentChain(patch.parent_task,snapshot.path);
+      const cachedFm=this.app.metadataCache.getFileCache(file)?.frontmatter;
+      const cachedSessions=parseWorkSessions(cachedFm?.task_sessions,cachedFm?.task_start,cachedFm?.task_end);
+      const previousWorkKey=this.workKey(cachedSessions,dateTime(cachedFm?.task_start)??cachedSessions[0]?.start??null,dateTime(cachedFm?.task_end)??(cachedSessions.length?cachedSessions[cachedSessions.length-1].end:null));
       const before=await this.app.vault.read(file),preview=mergeTaskProperties(before,snapshot,patch,yaml);
       const rename=preview.changed.includes('target_date')&&dateValue(preview.properties.target_date)!==dateValue(taskDocument(before,yaml).fm.target_date);
       const destination=rename?this.uniqueEventPath(`${titleFor(file.basename,'task')} ${dateValue(preview.properties.target_date)||'TBD'}`,'task',file.path):file.path;
       let previous='',updated='';
+      let updatedWork:Record<string,unknown>|null=null;
       await this.app.vault.process(file,latest=>{
-        previous=latest;updated=mergeTaskProperties(latest,snapshot,patch,yaml).content;return updated;
+        previous=latest;
+        const merged=mergeTaskProperties(latest,snapshot,patch,yaml);
+        updated=merged.content;
+        if(merged.changed.some(k=>['task_sessions','task_start','task_end','status'].includes(k)))updatedWork=merged.properties;
+        return updated;
       });
       try { if(destination!==file.path)await this.app.fileManager.renameFile(file,destination); }
       catch(error) {
@@ -449,7 +457,9 @@ export class DaylightStore {
         } else {this.invalidate();throw new Error(t("名前変更後の処理を完了できませんでした。ノートを開き直してください。"));}
         this.invalidate();throw error;
       }
-      this.overrides.delete(snapshot.path);this.workOverrides.delete(snapshot.path);this.invalidate();result=file;
+      this.overrides.delete(snapshot.path);this.workOverrides.delete(snapshot.path);
+      if(updatedWork)this.captureWorkOverride(file.path,previousWorkKey,updatedWork);
+      this.invalidate();result=file;
     }));
     return result!;
   }

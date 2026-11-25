@@ -533,3 +533,55 @@ test('new tasks, events and projects have empty bodies when no memo or goal is e
     assert.equal(content.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '').trim(), '', file.path);
   }
 });
+
+test('sidebar updateTask edits, adds, and clears task_sessions including legacy start/end tasks', async () => {
+  const { store, task, fm } = await fixture();
+  const row = () => store.items().find((i: any) => i.path === task.path);
+
+  // Add sessions on a task that has none yet
+  await store.updateTask(await store.loadTask(task.path), {
+    task_sessions: ['2026-11-06T09:00..2026-11-06T09:45', '2026-11-06T13:30..2026-11-06T14:15'],
+  });
+  let data = fm.get(task.path);
+  assert.deepEqual(data.task_sessions, ['2026-11-06T09:00:00..2026-11-06T09:45:00', '2026-11-06T13:30:00..2026-11-06T14:15:00']);
+  assert.equal(data.task_start, '2026-11-06T09:00:00');
+  assert.equal(data.task_end, '2026-11-06T14:15:00');
+  assert.equal(row().taskSessions.length, 2);
+  assert.equal(row().taskStart, new Date(2026, 10, 6, 9, 0, 0).getTime());
+  assert.equal(row().taskEnd, new Date(2026, 10, 6, 14, 15, 0).getTime());
+
+  // Edit existing sessions
+  await store.updateTask(await store.loadTask(task.path), {
+    task_sessions: ['2026-11-06T08:30..2026-11-06T09:45'],
+  });
+  data = fm.get(task.path);
+  assert.deepEqual(data.task_sessions, ['2026-11-06T08:30:00..2026-11-06T09:45:00']);
+  assert.equal(data.task_start, '2026-11-06T08:30:00');
+  assert.equal(data.task_end, '2026-11-06T09:45:00');
+  assert.equal(row().taskSessions.length, 1);
+
+  // Clear sessions
+  await store.updateTask(await store.loadTask(task.path), {
+    task_sessions: null,
+    task_start: null,
+    task_end: null,
+  });
+  data = fm.get(task.path);
+  assert.equal(data.task_sessions, null);
+  assert.equal(data.task_start, null);
+  assert.equal(data.task_end, null);
+  assert.equal(row().taskSessions.length, 0);
+  assert.equal(row().taskStart, null);
+  assert.equal(row().taskEnd, null);
+
+  // Legacy task without task_sessions
+  fm.get(task.path).task_start = '2026-11-06T10:00:00';
+  fm.get(task.path).task_end = '2026-11-06T11:00:00';
+  delete fm.get(task.path).task_sessions;
+  store.invalidate();
+  await store.updateTask(await store.loadTask(task.path), {
+    task_sessions: ['2026-11-06T10:00..2026-11-06T11:30'],
+  });
+  assert.deepEqual(fm.get(task.path).task_sessions, ['2026-11-06T10:00:00..2026-11-06T11:30:00']);
+  assert.equal(row().taskEnd, new Date(2026, 10, 6, 11, 30, 0).getTime());
+});
